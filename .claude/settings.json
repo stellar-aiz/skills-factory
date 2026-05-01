@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "skills_factory プロジェクト用 Claude Code 設定。グローバル ~/.claude/settings.json とマージされる。同名キーはプロジェクト側が優先。詳細は docs/harness_check/settings_design.md 参照。",
+  "env": {
+    "FACTORY_ROOT": "$CLAUDE_PROJECT_DIR"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python3 tools/build_skill.py:*)",
+      "Bash(python3 tools/validate_pptx.py:*)",
+      "Bash(python3 tools/smoke_test_all.py:*)",
+      "Bash(python3 tools/pptx_audit.py:*)",
+      "Bash(python3 tools/pptx_roundtrip.py:*)",
+      "Bash(python3 tools/extract_sample_data.py:*)",
+      "Bash(python3 tools/fix_template_rels.py:*)",
+      "Bash(python3 tools/add_finalize_hook.py:*)",
+      "Bash(python3 *fill_*.py:*)",
+      "Bash(python3 *merge_pptx_v2.py:*)",
+      "Bash(pip install python-pptx:*)",
+      "Bash(pip install lxml:*)",
+      "Bash(python -m markitdown:*)",
+      "Bash(mkdir -p outputs/*)",
+      "Bash(mkdir -p work/*)",
+      "Bash(mkdir -p docs/*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/hooks/load_session_context.py\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/hooks/check_merge_order_exists.py\"",
+            "timeout": 2000
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/hooks/check_task_progression.py\"",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/hooks/validate_pptx_after_fill.py\"",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}
