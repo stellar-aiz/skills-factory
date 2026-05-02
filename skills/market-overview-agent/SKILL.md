@@ -16,6 +16,11 @@ description: >
   - 「市場規模・シェア・KBF・PEST・競合戦略」を統合した1本のレポートが求められた場合
   - 「Market Overview」「市場サマリー」「市場リサーチ」「業界調査」「市場レビュー」という言葉
   - 単一の PPTX スキル（market-environment-pptx 等）の起動で済まない、横断的な市場調査依頼
+
+  以下の場合は別スキルを使う:
+  - 「対象会社 1 社の深掘り」 → company-deepdive-agent
+  - 「単一の事業セグメントだけ深掘り」 → business-deepdive-agent
+  - 単一の PPTX スライドだけ作りたい → 該当する個別 PPTX スキル（market-environment-pptx / market-share-pptx 等）
 ---
 
 # Market Overview Agent
@@ -164,7 +169,40 @@ Step 10: ユーザーへ提示（PPTX + MDの2ファイル）
 
 ---
 
+## 進捗トラッキング規約（全 Step 横断、必須）
+
+<!-- source: skills/_common/prompts/step_state_tracking.md (manual sync until D2) -->
+
+各 Step の開始/終了で `TaskCreate` / `TaskUpdate` を呼び、`task_state.json` を更新する。詳細規約は `skills/_common/prompts/step_state_tracking.md` を正本とする。
+
+- **subject フォーマット**: `market-overview: Step <N> - <topic>`(例: `market-overview: Step 1 - Web検索 (5論点+PEST)`)。サブ番号 (Step 0.5 / 2.5 / 6-a / 8-b 等) も `Step 0.5` / `Step 6-a` のように subject に含める
+- **task_state.json 配置**: `{{WORK_DIR}}/<run_id>/task_state.json`(scope.json と同じディレクトリ)
+- **step_id**: `step_0` / `step_0_5` / `step_2_5` / `step_6_a` のように `.` と `-` を `_` に置換
+- **開始時**: `TaskCreate` で task を起こす → `TaskUpdate(in_progress)` → `task_state.json.steps[]` に append
+- **終了時**: `TaskUpdate(completed)` → `task_state.json` の該当 entry を `completed` + `completed_at` に更新
+- **失敗・再試行時**: `TaskUpdate(completed)` を呼ばない。`task_state.json` の `retry_count` のみインクリメント。Step 8 の visual-review 自動修正ループでは別途カウンタ（最大 2 ラウンド）を保持する
+
+`tools/hooks/check_task_progression.py` が `fill_*.py` / `merge_pptx_v2.py` 起動前にこのファイルを参照し、Step ordering inversion を検出して exit 2 でブロックする。
+
+---
+
+## ハーネスレバー利用規約（参照）
+
+<!-- source: skills/_common/references/harness_levers.md (manual sync until D2) -->
+
+本オーケストレーターは Claude Code ハーネス機構を以下のとおり活用する。詳細規約は `skills/_common/references/harness_levers.md` を参照。
+
+| レバー | 適用箇所 |
+|---|---|
+| ① hooks (`tools/hooks/*.py`) | `check_merge_order_exists`(Step 7 直前) / `validate_pptx_after_fill`(Step 5 / 7) / `check_task_progression`(全 Step) / `load_session_context` が `.claude/settings.json` 経由で発火 |
+| ② subagent (`.claude/agents/research-subagent.md`) | Step 1 で 5 論点 + PEST を並列起動。25-40 件の Web 検索結果（生 HTML）を親 context に積まず要約 JSON のみ受け取る（market-overview の 12箇条 #3 改善の核心）|
+| ③ TaskCreate / AskUserQuestion | 各 Step で TaskCreate（上記）。Step 0（スコープ確認）/ Step 0.5（事業モデル境界）/ Step 2.5（factcheck スコープ）/ Step 3（Markdown 承認）/ Step 8 残存 issue 判断で AskUserQuestion 必須 |
+
+---
+
 ## Step 0: 市場スコープ確認
+
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 0 - スコープ確認")` → Step 0.0 / 0.5 完了後にまとめて `TaskUpdate(completed)` + `task_state.json` 更新。**`AskUserQuestion` 必須**(自由対話での確定は禁止、Step 0.0 と Step 0.5 両方で必須)。
 
 <!-- source: skills/_common/prompts/step0_scope_clarification.md (manual sync until D2) -->
 
@@ -245,9 +283,39 @@ D. その他（自由記述）
 
 ---
 
-## Step 1: Web検索による論点別情報収集
+## Step 1: research-subagent 経由で論点別情報収集
 
-各論点について Web 検索を行い、JSON データを `data_NN_*.json` として保存する。
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 1 - Web検索 (5論点+PEST)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
+
+5 論点 + PEST のそれぞれについて、`research-subagent`(`.claude/agents/research-subagent.md`) を **Agent ツール経由で並列起動** して情報収集する。各 subagent は 5-8 件の Web 検索 + 必要に応じた fetch を実施し、`output_schema` に沿った要約済み JSON のみ親に返却する。**生 HTML / 検索結果テキストは subagent 自身の context 内で完結し、親 context には流入しない**(market-overview は 25-40 件の Web 検索を伴うため、本対策が 12箇条 #3「コンテキスト制御」改善の核心)。
+
+### subagent 呼び出しパターン（論点ごと、並列起動可）
+
+```python
+import json
+result = Agent(
+    subagent_type="research-subagent",
+    description=f"{market_name} の<論点名>調査",
+    prompt=json.dumps({
+        "topic_id": "data_<NN>_<topic>",  # 論点別の data ファイル名と対応
+        "topic_description": "<論点の自然文要約>",
+        "output_schema": {<該当 PPTX スキルの JSON schema>},
+        "parent_context": {
+            "industry": market_name,
+            "geography": scope.geography,
+            "scope_constraints": {
+                "included_business_models": scope.included_business_models,
+                "excluded_segments": scope.excluded_segments
+            },
+            "target_company": scope.highlight_company  # 強調会社が指定されていれば
+        },
+        "search_budget": {"min_searches": 5, "max_searches": 8}
+    })
+)
+parsed = json.loads(result)
+# parsed["data"] を {{WORK_DIR}}/<run_id>/data_<NN>_<topic>.json に Write で書き出す
+# parsed["open_questions"] を data_12_data_availability.json と FactCheck_Report.md に転記
+```
 
 ### 検索の優先順位
 
@@ -317,6 +385,8 @@ D. その他（自由記述）
 
 ## Step 2: データアベイラビリティ整理
 
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 2 - データアベイラビリティ")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
+
 `data-availability-pptx` のJSON 形式（カテゴリ×項目×ステータス×データソース）に整理。
 ステータスは `✓取得済 / △一部取得 / ✗未取得` の3値。
 
@@ -327,6 +397,8 @@ D. その他（自由記述）
 ---
 
 ## Step 2.5: ファクトチェック
+
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 2.5 - ファクトチェック")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。**スコープ選択の `AskUserQuestion` 必須**(high_risk / all / skip)。
 
 <!-- source: skills/_common/prompts/step2_5_factcheck_invocation.md (manual sync until D2) -->
 
@@ -366,6 +438,8 @@ D. その他（自由記述）
 
 ## Step 3: Markdownでユーザーに確認
 
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 3 - Markdown 承認")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。**承認の `AskUserQuestion` 必須**。
+
 調査結果＋推奨スライド構成＋ファクトチェック要確認項目を1つの Markdown でユーザーに提示し、
 承認を得る。
 
@@ -404,6 +478,8 @@ D. その他（自由記述）
 
 ## Step 4: Key Findings 整理（Executive Summary 用）
 
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 4 - Key Findings 整理")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
+
 5 Findings パターンで `data_01_exec_summary.json` を生成:
 
 1. **市場規模と成長性**: 「市場規模は{X}億円、CAGRは過去{N}年で{Y}%、今後{M}年は{Z}%が見込まれる」
@@ -420,6 +496,8 @@ D. その他（自由記述）
 ---
 
 ## Step 5: スライド生成
+
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 5 - スライド生成 (10-12枚)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。本 Step 中は `validate_pptx_after_fill.py` hook が各 fill_*.py 実行後に PPTX 整合性を自動検証する。
 
 `references/deck_skeleton_standard.json` の順序通りに slide_NN_*.pptx を生成。
 
@@ -454,6 +532,8 @@ python {{SKILL_DIR}}/<dependency_skill>/scripts/fill_<name>.py \
 ---
 
 ## Step 6: マージ順序照合表 + merge_order.json
+
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 6 - merge_order.json 構築")` → Step 6-a / 6-b 両方完了後に `TaskUpdate(completed)` + `task_state.json` 更新。
 
 <!-- source: skills/_common/references/orchestrator_contract.md (manual sync until D2) -->
 <!-- merge_order.json / merge_warnings.json / regeneration_hint の正規スキーマは上記参照 -->
@@ -553,6 +633,8 @@ python {{SKILL_DIR}}/<dependency_skill>/scripts/fill_<name>.py \
 
 ## Step 7: 結合（merge-pptxv2）
 
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 7 - merge-pptxv2 結合")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。本 Step は `check_merge_order_exists.py` hook が `merge_order.json` の存在を assert（無ければ exit 2 でブロック）し、`validate_pptx_after_fill.py` hook が結合後 PPTX を自動検証する。
+
 通し番号順に引数を並べてマージ。**`ls *.pptx | sort` の出力をそのまま流すのは禁止**。
 
 ```bash
@@ -594,6 +676,8 @@ merge-pptxv2 の出力ログで、各スライド番号の Main Message と shap
 
 ## Step 8: ビジュアル品質レビュー＋自動修正ループ
 
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 8 - Visual Review + 自動修正")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。`severity=high` 残存時は **`AskUserQuestion`** で手動修正 / 許容を選ばせる必須。自動修正ループは別カウンタ（最大 2 ラウンド）。
+
 <!-- source: skills/_common/prompts/step_final_visual_review_loop.md (manual sync until D2) -->
 
 ### Step 8-a: visual-quality-reviewer 起動
@@ -631,6 +715,8 @@ merge-pptxv2 の出力ログで、各スライド番号の Main Message と shap
 ---
 
 ## Step 9: FactCheck_Report.md 生成（最終納品物）
+
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 9 - FactCheck_Report.md 生成")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
 
 `fact_check_report.json` を Markdown に整形して、`{{OUTPUT_DIR}}/FactCheck_Report_<market_name>_<date>.md`
 に保存する。テンプレートは `prompts/step9_factcheck_md_template.md` を参照。
@@ -687,6 +773,8 @@ merge-pptxv2 の出力ログで、各スライド番号の Main Message と shap
 ---
 
 ## Step 10: ユーザーへ提示
+
+**進捗**: 開始時 `TaskCreate(subject="market-overview: Step 10 - 最終納品")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
 
 最終的に2つのファイルを提示する：
 
