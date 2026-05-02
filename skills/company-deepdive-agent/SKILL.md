@@ -18,6 +18,11 @@ description: >
   - 「対象会社 1 社を深く調べて」「マーケットの中で○○社を分析して」という要望
   - market-overview-agent でプレイヤー特定後、各社の深掘りに進む場合
   - 複数社を横並び比較する前段として、各社個別のデッキを作る場合
+
+  以下の場合は別スキルを使う:
+  - 「市場全体の調査」 → market-overview-agent
+  - 「単一の事業セグメントだけ深掘り」 → business-deepdive-agent（直接起動）
+  - 単一の PPTX スライドだけ作りたい → 該当する個別 PPTX スキル
 ---
 
 # 会社深掘りオーケストレーター
@@ -32,6 +37,38 @@ ISSUE-004（v0.3）における新規オーケストレーター。`market-overv
 - 取れなかった項目は `data-availability-pptx` で「✗未取得」明示（smallcap の三角測量は使わない、シンプルに公開情報をそのまま記述）
 - セグメント検出は本スキルの責務（`business-deepdive-agent` への引き渡しは本スキル経由）
 - merge-pptxv2 / visual-quality-reviewer / fact-check-reviewer の呼び出しも本スキル責務（business-deepdive-agent は個別 PPTX のみ返却）
+
+---
+
+## 進捗トラッキング規約（全 Step 横断、必須）
+
+<!-- source: skills/_common/prompts/step_state_tracking.md (manual sync until D2) -->
+
+各 Step の開始/終了で `TaskCreate` / `TaskUpdate` を呼び、`task_state.json` を更新する。詳細規約は `skills/_common/prompts/step_state_tracking.md` を正本とする。
+
+- **subject フォーマット**: `company-deepdive: Step <N> - <topic>`(例: `company-deepdive: Step 5 - 会社レベル PPTX 生成`)。Step 0.5 / 2.5 等のサブ番号はそのまま使う（例: `company-deepdive: Step 2.5 - ファクトチェック`）
+- **task_state.json 配置**: `{{WORK_DIR}}/company-deepdive-agent/<run_id>/task_state.json`(scope.json と同じディレクトリ)
+- **開始時**: `TaskCreate` で task を起こす → `TaskUpdate(in_progress)` → `task_state.json.steps[]` に append（`step_id` は `step_0` / `step_0_5` / `step_2_5` のように `.` を `_` に変換）
+- **終了時**: `TaskUpdate(completed)` → `task_state.json` の該当 entry を `completed` + `completed_at` に更新
+- **失敗・再試行時**: `TaskUpdate(completed)` を呼ばない。`task_state.json` の `retry_count` のみインクリメント
+
+**business-deepdive-agent への委譲時**: Step 6 で子オーケストレータを起動するが、子は自身の `task_state.json` を `segments/<slug>/` 配下に持つ。親（本スキル）の `task_state.json` には子の起動・完了を `step_6` として記録する（個々のセグメントの内部 Step は子側に任せる）。
+
+`tools/hooks/check_task_progression.py` が `fill_*.py` / `merge_pptx_v2.py` 起動前にこのファイルを参照し、Step ordering inversion を検出して exit 2 でブロックする。
+
+---
+
+## ハーネスレバー利用規約（参照）
+
+<!-- source: skills/_common/references/harness_levers.md (manual sync until D2) -->
+
+本オーケストレーターは Claude Code ハーネス機構を以下のとおり活用する。詳細規約は `skills/_common/references/harness_levers.md` を参照。
+
+| レバー | 適用箇所 |
+|---|---|
+| ① hooks (`tools/hooks/*.py`) | `check_merge_order_exists`(Step 8 直前) / `validate_pptx_after_fill`(Step 5 / 8) / `check_task_progression`(全 Step) / `load_session_context` が `.claude/settings.json` 経由で発火 |
+| ② subagent (`.claude/agents/research-subagent.md`) | Step 1 で会社レベル 5 論点を並列起動。生 HTML / IR 全文を親 context に積まず要約 JSON のみ受け取る |
+| ③ TaskCreate / AskUserQuestion | 各 Step で TaskCreate（上記）。Step 0（対象会社確認）/ Step 0.5（同名異社）/ Step 2.5（factcheck スコープ）/ Step 3（Markdown 承認）で AskUserQuestion 必須 |
 
 ---
 
@@ -86,6 +123,8 @@ ISSUE-004（v0.3）における新規オーケストレーター。`market-overv
 
 ### Step 0: 対象会社・出力先確認
 
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 0 - 対象会社・出力先確認")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。**`AskUserQuestion` 必須**（自由対話での確定は禁止）。
+
 `AskUserQuestion` で以下を確定:
 
 | 質問 | 選択肢 |
@@ -103,29 +142,62 @@ ISSUE-004（v0.3）における新規オーケストレーター。`market-overv
 
 ### Step 0.5: 同名異社の確認（任意）
 
+**進捗**: 同名異社の可能性がある場合のみ実施。実施時は `TaskCreate(subject="company-deepdive: Step 0.5 - 同名異社確認")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。**`AskUserQuestion` 必須**。
+
 検索結果に複数の同名企業がある場合、ユーザーに正式名称・本社所在地・上場区分で確認。
 （market-overview-agent の Step 0.5 とは別の問題で、ここでは事業モデル境界ではなく企業特定が論点）
 
-### Step 1: Web 検索による会社レベル 5 論点の情報収集
+### Step 1: research-subagent 経由で会社レベル 5 論点の情報収集
 
-`prompts/step1_research_template.md` のクエリテンプレートに `{company_name}` / `{industry}` / `{competitors[]}` を展開し、5 論点それぞれ **5-8 件** WebSearch を実行。
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 1 - Web検索 (会社レベル5論点)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
 
-| 論点 | 優先ソース |
-|---|---|
-| 会社の概要 | 公式 HP / 会社案内 / 有報冒頭（上場の場合） |
-| 沿革 | 公式 HP / 統合報告書 / Wikipedia（一次ソース確認必須） |
-| 事業ポートフォリオ | 有報「事業の状況」/ 決算短信セグメント情報 / HP「事業内容」 |
-| 収益性 | 有報・決算短信・SPEEDA / EDINET / 競合社の同種データ |
-| 株主・役員 | 有報「株主構成」「役員構成」/ 統合報告書 / 会社案内 |
+5 論点それぞれについて、`research-subagent`(`.claude/agents/research-subagent.md`) を **Agent ツール経由で並列起動** して情報収集する。各 subagent は 5-8 件の Web 検索 + 必要に応じた fetch を実施し、`output_schema` に沿った要約済み JSON のみ親に返却する。**生 HTML / IR 全文 / 有報原文は subagent 自身の context 内で完結し、親 context には流入しない**（会社レベル深掘りは IR・有報を多数読むため、特に効果が大きい）。
 
-**非上場の場合**は公式 HP・プレスリリース・業界誌・FUMA・Baseconnect・帝国データバンク・官報決算公告で埋められる範囲のみ取得。
+#### subagent 呼び出しパターン（論点ごと、並列起動可）
+
+```python
+import json
+result = Agent(
+    subagent_type="research-subagent",
+    description=f"{company_name} の<論点名>調査",
+    prompt=json.dumps({
+        "topic_id": "data_<NN>_company_profile",  # 論点別の data ファイル名と対応
+        "topic_description": "<論点の自然文要約>",
+        "output_schema": {<該当 PPTX スキルの JSON schema>},
+        "parent_context": {
+            "industry": industry,
+            "target_company": company_name,
+            "scope_constraints": {}  # 競合社母集団等の境界がある場合
+        },
+        "search_budget": {"min_searches": 5, "max_searches": 8}
+    })
+)
+parsed = json.loads(result)
+# parsed["data"] を {{work_dir}}/data_<NN>_<topic>.json に Write で書き出す
+```
+
+`prompts/step1_research_template.md` のクエリテンプレートは subagent 起動時の `topic_description` 構築のヒントとして親が参照する。
+
+| 論点 | 優先ソース | subagent への topic_description で強調すべき点 |
+|---|---|---|
+| 会社の概要 | 公式 HP / 会社案内 / 有報冒頭（上場の場合） | 会社の主要数字 + 事業領域 + 設立年 |
+| 沿革 | 公式 HP / 統合報告書 / Wikipedia（一次ソース確認必須） | 年表形式で M&A や事業転換の重要イベント |
+| 事業ポートフォリオ | 有報「事業の状況」/ 決算短信セグメント情報 / HP「事業内容」 | セグメント別売上・成長率・利益率（複数年） |
+| 収益性 | 有報・決算短信・SPEEDA / EDINET / 競合社の同種データ | 売上・営業利益・EBITDA / 競合 5 社との比較 |
+| 株主・役員 | 有報「株主構成」「役員構成」/ 統合報告書 / 会社案内 | 主要株主と議決権 + 役員プロファイル |
+
+**非上場の場合**は公式 HP・プレスリリース・業界誌・FUMA・Baseconnect・帝国データバンク・官報決算公告で埋められる範囲のみ取得。subagent 側でも同じ優先順位で検索する。
 
 ### Step 2: データアベイラビリティ整理
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 2 - データアベイラビリティ")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
 
 `{{WORK_DIR}}/company-deepdive-agent/<run_id>/data_15_data_availability.json` に集計。
 `status` は `obtained` / `partial` / `missing` の 3 値。事業セグメント分（business-deepdive-agent の `segment_data_availability.json`）も統合する。
 
 ### Step 2.5: ファクトチェック（推奨実施）
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 2.5 - ファクトチェック")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。**スコープ選択で `AskUserQuestion` 必須**(high_risk / all / skip)。
 
 `fact-check-reviewer` を呼ぶ。下記の共通パターンに従う。
 
@@ -166,13 +238,19 @@ ISSUE-004（v0.3）における新規オーケストレーター。`market-overv
 
 ### Step 3: ユーザーに会社レベル情報を Markdown で提示・承認
 
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 3 - Markdown 承認")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。**承認の `AskUserQuestion` 必須**。
+
 会社レベル 5 論点と検証論点（fact-check 結果）を統合した Markdown をユーザーに提示し、修正・承認を得る。
 
 ### Step 4: 会社レベル Key Findings + 検証論点整理
 
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 4 - Key Findings 整理")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
+
 `executive-summary-pptx` 用に Key Findings 3-5 個を整理。会社レベル + 各セグメントの戦略的論点を統合。
 
 ### Step 5: 会社レベル PPTX 生成
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 5 - 会社レベル PPTX 生成 (8 枚)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。本 Step 中は `validate_pptx_after_fill.py` hook が各 fill_*.py 実行後に PPTX 整合性を自動検証する。
 
 各論点を対応 PPTX スキル（上記マッピング）の `fill_*.py` で生成。
 
@@ -188,6 +266,8 @@ ISSUE-004（v0.3）における新規オーケストレーター。`market-overv
 | 08 | shareholder-structure-pptx | `data_08_shareholder_structure.json` | `slide_08_shareholder_structure.pptx` |
 
 ### Step 6: セグメント検出 + business-deepdive-agent を起動
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 6 - セグメント検出 + 子オーケストレータ起動 (N 並列)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。子 `business-deepdive-agent` は自身の `task_state.json` を `segments/<slug>/` 配下に持つ（親には影響しない）。
 
 Step 5 で生成した `business-portfolio-pptx` の入力データから報告セグメント一覧を抽出。
 複数事業の場合は Step 0 で確定した深掘りセグメント（A. 全 / B. ユーザー指定 / C. なし）に従い、対象セグメントごとに `business-deepdive-agent` を起動。
@@ -233,6 +313,8 @@ cp $SEG_DIR/slide_02_business_model.pptx $SEG_DIR/slide_11_business_model.pptx
 ```
 
 ### Step 7: 中扉 + data-availability + merge_order.json 構築
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 7 - 中扉 + merge_order.json 構築")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
 
 中扉スライド（各セグメント冒頭）を `section-divider-pptx` で生成し、最終 data-availability スライドを `data-availability-pptx` で生成。
 
@@ -289,6 +371,8 @@ cp $SEG_DIR/slide_02_business_model.pptx $SEG_DIR/slide_11_business_model.pptx
 
 ### Step 8: merge-pptxv2 で結合
 
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 8 - merge-pptxv2 結合")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。本 Step は `check_merge_order_exists.py` hook が `merge_order.json` の存在を assert（無ければ exit 2 でブロック）し、`validate_pptx_after_fill.py` hook が結合後 PPTX を自動検証する。
+
 ```bash
 python3 ~/.claude/skills/merge-pptxv2/scripts/merge_pptx_v2.py \
   outputs/<run_id>/CompanyDeepDive_<会社名>_<date>.pptx \
@@ -299,6 +383,8 @@ python3 ~/.claude/skills/merge-pptxv2/scripts/merge_pptx_v2.py \
 完了後、`{{OUTPUT_DIR}}/<run_id>/merge_warnings.json` を確認（`section_divider_position` 違反 0 件であること）。
 
 ### Step 9: visual-quality-reviewer + 自動修正ループ（最大 2 ラウンド）
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 9 - Visual Review + 自動修正")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。`severity=high` 残存時は **`AskUserQuestion`** で手動修正 / 許容を選ばせる必須。
 
 下記の共通パターンに従う。
 
@@ -340,6 +426,8 @@ python3 ~/.claude/skills/merge-pptxv2/scripts/merge_pptx_v2.py \
 **2 ラウンド終了時点で `severity=high` が残存する場合**: ユーザーに残存 issue を提示し、手動修正か許容の判断を仰ぐ。
 
 ### Step 10: ユーザーへ最終納品
+
+**進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 10 - 最終納品")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。
 
 - `outputs/<run_id>/CompanyDeepDive_<会社名>_<date>.pptx`（結合デッキ、N=1 なら 15 枚）
 - `outputs/<run_id>/FactCheck_Report.md`（fact-check 全件レポート、Step 2.5 の最終出力）
