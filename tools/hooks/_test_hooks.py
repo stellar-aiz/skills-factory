@@ -22,13 +22,21 @@ MERGE_SCRIPT = "merge_pptx" + "_v2.py"
 FILL_SCRIPT = "fill_" + "test_skill.py"
 
 
-def run_hook(script_name: str, event: dict) -> tuple[int, str, str]:
+def run_hook(
+    script_name: str,
+    event: dict,
+    env_overrides: dict | None = None,
+) -> tuple[int, str, str]:
+    env = os.environ.copy()
+    if env_overrides:
+        env.update(env_overrides)
     result = subprocess.run(
         [sys.executable, str(HOOKS_DIR / script_name)],
         input=json.dumps(event),
         capture_output=True,
         text=True,
         timeout=30,
+        env=env,
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -177,8 +185,124 @@ def test_load_session_context() -> None:
     t("stdout に ISSUE-001 が含まれる", "ISSUE-001" in result.stdout)
 
 
+def _make_state_file(tmp: Path, orchestrator: str, run_id: str, steps: list) -> Path:
+    work_dir = tmp / "work" / orchestrator / run_id
+    work_dir.mkdir(parents=True, exist_ok=True)
+    state_path = work_dir / "task_state.json"
+    state_path.write_text(json.dumps({
+        "run_id": run_id,
+        "orchestrator": orchestrator,
+        "started_at": "2026-05-02T10:00:00+09:00",
+        "steps": steps,
+    }), encoding="utf-8")
+    return state_path
+
+
+def test_check_task_progression() -> None:
+    print("\n[check_task_progression.py]")
+
+    bash_event = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {"command": f"python3 {FILL_SCRIPT} --output x.pptx"},
+    }
+
+    # 1. PreToolUse でない → 素通り
+    ec, _, _ = run_hook("check_task_progression.py",
+                        {**bash_event, "hook_event_name": "PostToolUse"})
+    t("PostToolUse は素通り", ec == 0, f"exit={ec}")
+
+    # 2. 非 Bash → 素通り
+    ec, _, _ = run_hook("check_task_progression.py",
+                        {**bash_event, "tool_name": "Read"})
+    t("非 Bash は素通り", ec == 0, f"exit={ec}")
+
+    # 3. 無関係 command (fill_*/merge_pptx_v2 でない) → 素通り
+    ec, _, _ = run_hook("check_task_progression.py",
+                        {**bash_event, "tool_input": {"command": "ls -la"}})
+    t("無関係 command は素通り", ec == 0, f"exit={ec}")
+
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp = Path(tmp_str)
+
+        # 4. state file 不在 → 素通り（backward compat）
+        ec, _, _ = run_hook("check_task_progression.py", bash_event,
+                            env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("state file 不在で素通り (backward compat)", ec == 0, f"exit={ec}")
+
+        # 5. 単一 step (順序違反不能) → 素通り
+        _make_state_file(tmp, "test-orchestrator", "test_run_5", [
+            {"step_id": "step_1", "name": "Step 1", "status": "in_progress"},
+        ])
+        ec, _, _ = run_hook("check_task_progression.py", bash_event,
+                            env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("単一 step は素通り", ec == 0, f"exit={ec}")
+
+        # 6. 全 step completed (最後の step も含む) → 素通り
+        _make_state_file(tmp, "test-orchestrator", "test_run_6", [
+            {"step_id": "step_1", "name": "Step 1", "status": "completed"},
+            {"step_id": "step_2", "name": "Step 2", "status": "completed"},
+        ])
+        ec, _, _ = run_hook("check_task_progression.py", bash_event,
+                            env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("全 step completed で素通り", ec == 0, f"exit={ec}")
+
+        # 7. 末尾 in_progress、それ以前 completed → 素通り（正常進行）
+        _make_state_file(tmp, "test-orchestrator", "test_run_7", [
+            {"step_id": "step_1", "name": "Step 1", "status": "completed"},
+            {"step_id": "step_2", "name": "Step 2", "status": "in_progress"},
+        ])
+        ec, _, _ = run_hook("check_task_progression.py", bash_event,
+                            env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("正常進行は素通り (last=in_progress)", ec == 0, f"exit={ec}")
+
+        # 8. State inversion: 前 step が in_progress のまま次に進んだ → ブロック
+        _make_state_file(tmp, "test-orchestrator", "test_run_8", [
+            {"step_id": "step_1", "name": "Step 1: Web検索", "status": "in_progress"},
+            {"step_id": "step_2", "name": "Step 2: 整理", "status": "in_progress"},
+        ])
+        ec, _, err = run_hook("check_task_progression.py", bash_event,
+                              env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("state inversion (前 step in_progress) をブロック",
+          ec == 2 and "規約違反" in err and "step_1" in err,
+          f"exit={ec}")
+
+        # 9. State inversion: 前 step が failed → ブロック
+        _make_state_file(tmp, "test-orchestrator", "test_run_9", [
+            {"step_id": "step_1", "name": "Step 1", "status": "failed"},
+            {"step_id": "step_2", "name": "Step 2", "status": "in_progress"},
+        ])
+        ec, _, err = run_hook("check_task_progression.py", bash_event,
+                              env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("state inversion (前 step failed) をブロック",
+          ec == 2 and "failed" in err, f"exit={ec}")
+
+        # 10. State inversion: 前 step が pending → ブロック
+        _make_state_file(tmp, "test-orchestrator", "test_run_10", [
+            {"step_id": "step_1", "name": "Step 1", "status": "pending"},
+            {"step_id": "step_2", "name": "Step 2", "status": "in_progress"},
+        ])
+        ec, _, err = run_hook("check_task_progression.py", bash_event,
+                              env_overrides={"FACTORY_ROOT": str(tmp)})
+        t("state inversion (前 step pending) をブロック",
+          ec == 2 and "pending" in err, f"exit={ec}")
+
+        # 11. 壊れた state file → 素通り（robustness）
+        broken_dir = tmp / "work" / "broken-orch" / "broken_run"
+        broken_dir.mkdir(parents=True)
+        (broken_dir / "task_state.json").write_text("{ this is not valid json")
+        ec, _, _ = run_hook("check_task_progression.py", bash_event,
+                            env_overrides={"FACTORY_ROOT": str(tmp)})
+        # 11 では他の正常 state file (steps[1] inversion なし) が複数存在し、
+        # 「最も最近更新された」が壊れた file になる可能性。
+        # その場合は exit 0 (素通り)、別の file が拾われたら exit によらず robust 確認のみ
+        t("壊れた state file は exception せず終了", ec in (0, 2),
+          f"exit={ec} (どちらでも robustness OK)")
+
+
 if __name__ == "__main__":
     test_check_merge_order_exists()
     test_validate_pptx_after_fill()
     test_load_session_context()
+    test_check_task_progression()
     print("\n✅ All hook tests passed.")

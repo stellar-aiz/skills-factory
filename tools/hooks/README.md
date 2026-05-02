@@ -8,10 +8,10 @@ skills_factory プロジェクト用の Claude Code hook スクリプト群。`.
 |---|---|---|---|
 | `load_session_context.py` | `SessionStart` | (なし) | ISSUES.md と直近 plan を stdout に出力し context に注入 |
 | `check_merge_order_exists.py` | `PreToolUse` | `Bash` | `merge_pptx_v2.py` 起動前に `--merge-order` 引数のファイル存在を assert |
-| `check_task_progression.py` | `PreToolUse` | `Bash` | 次 Step のツール起動前に前 Step の TaskCreate タスクが completed か検証 |
-| `validate_pptx_after_fill.py` | `PostToolUse` | `Bash` | `fill_*.py` 実行後に出力 PPTX を `tools/validate_pptx.py` で自動検証 |
+| `check_task_progression.py` | `PreToolUse` | `Bash` | `fill_*.py` / `merge_pptx_v2.py` 起動前に `task_state.json` の Step ordering inversion を検出。違反時 exit 2 でブロック |
+| `validate_pptx_after_fill.py` | `PostToolUse` | `Bash` | `fill_*.py` / `merge_pptx_v2.py` 実行後に出力 PPTX を `tools/validate_pptx.py` で自動検証 |
 
-現在は **すべてスタブ（exit 0 のみ）**。実装は Phase B-2 で行う。
+すべて Phase B-2 で実装済み。`tools/hooks/_test_hooks.py` で **26 ユニットテスト** が PASS することを確認している（PASS/FAIL の expected behavior、エッジケース、引用符パターン、state inversion 検出、backward compat 等）。
 
 ## 入出力 contract
 

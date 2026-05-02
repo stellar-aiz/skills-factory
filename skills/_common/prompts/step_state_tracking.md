@@ -9,7 +9,7 @@
 目的:
 1. **#5 状態統合**: ログを掘らなくても TaskList で「いま何 Step まで終わってるか」が分かる
 2. **#6 開始停止再開**: 中断後の resume 地点を機械的に判定できる
-3. **#8 制御フロー**: hooks（`tools/hooks/check_task_progression.py`、B-2-d で実装予定）が前 Step 完了を assert できる
+3. **#8 制御フロー**: hooks（`tools/hooks/check_task_progression.py`）が前 Step 完了を assert できる
 4. **#12 ステートレス**: LLM の会話履歴に頼らず、外部ファイルが state machine の真実源
 
 ---
@@ -151,7 +151,7 @@
 
 ### hooks による参照
 
-`tools/hooks/check_task_progression.py`(B-2-d、現状スタブ）が本ファイルを読み、Step N+1 のツール呼び出し前に Step N の status が `completed` であることを assert する。違反は exit 2 でブロック。
+`tools/hooks/check_task_progression.py` が `{{FACTORY_ROOT}}/work/*/*/task_state.json` から本ファイルを探し、`fill_*.py` / `merge_pptx_v2.py` 起動前に **Step ordering inversion**（`steps[:-1]` の中に `status != "completed"` の entry がある状態）を検出する。違反は exit 2 でブロックされ、stderr に「どの step が違反か」が表示される。task_state.json が存在しない orchestrator は素通り（backward compat）。
 
 ### 後方互換
 

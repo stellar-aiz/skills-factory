@@ -36,11 +36,11 @@ skills_factory のオーケストレーターが Claude Code ハーネス（`.cl
 
 **SKILL.md 側の責務**: 特になし（受動的な恩恵）。ただし ISSUES.md のフォーマット（`## ISSUE-NNN: <title>` + `**Status**: <status>`）を維持すること。
 
-### `check_task_progression.py`(B-2-d、未実装)
+### `check_task_progression.py`(PreToolUse, Bash)
 
-**強制内容（実装後）**: Step N+1 のツール呼び出し前に Step N の TaskCreate タスクが `completed` であることを assert。違反は exit 2 でブロック。
+**強制内容**: `fill_*.py` / `merge_pptx_v2.py` 起動時に `{{FACTORY_ROOT}}/work/<orchestrator>/<run_id>/task_state.json` を読み、**Step ordering inversion**（最後の step より前に `completed` でない step がある状態）を検出。違反は exit 2 でブロック。task_state.json が存在しない orchestrator は素通り（backward compat）。
 
-**SKILL.md 側の責務**: `step_state_tracking.md` の規約（TaskCreate / TaskUpdate / `task_state.json` 更新）を厳守。
+**SKILL.md 側の責務**: `step_state_tracking.md` の規約（TaskCreate / TaskUpdate / `task_state.json` 更新）を厳守。Step 開始時に必ず `task_state.json` の `steps[]` に append、終了時に該当 entry を `completed` に更新する。
 
 ### hook がブロックされたときの SKILL.md author の責任
 
