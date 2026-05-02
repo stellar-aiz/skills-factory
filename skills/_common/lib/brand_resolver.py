@@ -112,19 +112,27 @@ class BrandTheme:
     def template_path(self, skill_dir: str, skill_name: str) -> str:
         """Resolve path to the brand-specific template pptx for this skill.
 
-        Looks under `<skill_dir>/assets/<brand>/<skill_name>-template.pptx`.
-        Falls back to `<skill_dir>/assets/<skill_name>-template.pptx` if the
-        per-brand file does not exist (legacy single-template layout).
+        Resolution order:
+          1. `<skill_dir>/assets/<brand>/<skill_name>-template.pptx` (curated brand template)
+          2. `<skill_dir>/assets/stellar_aiz/<skill_name>-template.pptx` (V1 placeholder
+             fallback for non-stella brands that don't yet have a curated template;
+             produces working output with stella slide structure + the requested brand's
+             theme JSON applied)
+          3. `<skill_dir>/assets/<skill_name>-template.pptx` (legacy single-template
+             layout, pre-brand-aware skills)
         """
         branded = os.path.join(skill_dir, "assets", self.id, f"{skill_name}-template.pptx")
         if os.path.exists(branded):
             return branded
+        stella_default = os.path.join(skill_dir, "assets", "stellar_aiz", f"{skill_name}-template.pptx")
+        if os.path.exists(stella_default):
+            return stella_default
         legacy = os.path.join(skill_dir, "assets", f"{skill_name}-template.pptx")
         if os.path.exists(legacy):
             return legacy
         raise FileNotFoundError(
             f"template not found for brand={self.id} skill={skill_name}: "
-            f"tried {branded!r} and {legacy!r}"
+            f"tried {branded!r}, {stella_default!r}, {legacy!r}"
         )
 
 
