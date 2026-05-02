@@ -247,10 +247,34 @@ def cmd_build(args: argparse.Namespace) -> None:
     print(f"built -> {out_dir}")
 
 
+def _sync_common_assets() -> None:
+    """Copy skills/_common/{lib,brands}/ to ~/.claude/skills/_common/.
+
+    Brand-aware fill_*.py scripts import from `_common/lib/brand_resolver.py`
+    and read `_common/brands/<id>/theme.json` at runtime. Per-skill install
+    alone does not bring `_common/` along, so we sync those subtrees here.
+    Other `_common/` subdirs (prompts/, references/, styles/) are
+    documentation/source-only and not synced.
+    """
+    src_common = SKILLS_DIR / "_common"
+    if not src_common.exists():
+        return
+    dst_common = CLAUDE_CODE_SKILLS / "_common"
+    for sub in ("lib", "brands"):
+        src_sub = src_common / sub
+        if not src_sub.exists():
+            continue
+        dst_sub = dst_common / sub
+        if dst_sub.exists():
+            shutil.rmtree(dst_sub)
+        shutil.copytree(src_sub, dst_sub)
+
+
 def cmd_install(args: argparse.Namespace) -> None:
     target = CLAUDE_CODE_SKILLS / args.skill
     target.parent.mkdir(parents=True, exist_ok=True)
     build(args.skill, args.profile, target, strict=args.strict)
+    _sync_common_assets()
     print(f"installed -> {target}")
 
 

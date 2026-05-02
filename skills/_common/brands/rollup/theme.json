@@ -1,0 +1,48 @@
+{
+  "$schema_version": "1.0",
+  "id": "rollup",
+  "label": "Rollup Standard Format (vF 20250928)",
+  "slide_size": {
+    "width_in": 11.69,
+    "height_in": 8.27,
+    "aspect": "A4-landscape"
+  },
+  "fonts": {
+    "latin": "Yu Gothic UI",
+    "ea": "Yu Gothic UI",
+    "fallback_ea": ["Yu Gothic", "Hiragino Sans", "MS PGothic"]
+  },
+  "colors": {
+    "text": "#241A17",
+    "source": "#3E3A39",
+    "header_bg": "#F5EFE5",
+    "highlight_target": "#C78624",
+    "highlight_other": "#CDCECE",
+    "label_bar": "#7C4C2C",
+    "label_bg": "#F2E8DD",
+    "accent_revenue_bar": "#7C4C2C",
+    "accent_op_margin_line": "#604C3F",
+    "cagr_arrow": "#241A17"
+  },
+  "chart_palette": [
+    "#7C4C2C",
+    "#897141",
+    "#604C3F",
+    "#C78624",
+    "#AF7026",
+    "#3E3A39",
+    "#9C755F",
+    "#CDCECE"
+  ],
+  "defaults": {
+    "font_size_label_pt": 14,
+    "font_size_value_pt": 14,
+    "font_size_section_pt": 14,
+    "font_size_chart_title_pt": 11,
+    "font_size_data_label_pt": 11,
+    "font_size_legend_pt": 12,
+    "font_size_source_pt": 10,
+    "font_size_axis_pt": 11,
+    "font_size_cagr_pt": 16
+  }
+}

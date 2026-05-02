@@ -1,0 +1,48 @@
+{
+  "$schema_version": "1.0",
+  "id": "stellar_aiz",
+  "label": "Stellar AIZ Default",
+  "slide_size": {
+    "width_in": 13.33,
+    "height_in": 7.50,
+    "aspect": "16:9"
+  },
+  "fonts": {
+    "latin": "Meiryo UI",
+    "ea": "Meiryo UI",
+    "fallback_ea": ["MS PGothic", "Hiragino Sans"]
+  },
+  "colors": {
+    "text": "#333333",
+    "source": "#666666",
+    "header_bg": "#F5F0D0",
+    "highlight_target": "#E15759",
+    "highlight_other": "#BAB0AC",
+    "label_bar": "#4E79A7",
+    "label_bg": "#E8EEF5",
+    "accent_revenue_bar": "#4E79A7",
+    "accent_op_margin_line": "#003366",
+    "cagr_arrow": "#333333"
+  },
+  "chart_palette": [
+    "#4E79A7",
+    "#F28E2B",
+    "#59A14F",
+    "#76B7B2",
+    "#EDC948",
+    "#B07AA1",
+    "#FF9DA7",
+    "#9C755F"
+  ],
+  "defaults": {
+    "font_size_label_pt": 14,
+    "font_size_value_pt": 14,
+    "font_size_section_pt": 14,
+    "font_size_chart_title_pt": 11,
+    "font_size_data_label_pt": 11,
+    "font_size_legend_pt": 12,
+    "font_size_source_pt": 10,
+    "font_size_axis_pt": 11,
+    "font_size_cagr_pt": 16
+  }
+}
