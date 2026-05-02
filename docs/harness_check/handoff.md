@@ -45,8 +45,8 @@ de325ca feat(hooks): Phase B-2 hooks 3 本
 | B-6 | 既存 orchestrator 3 本 (business / company / market deepdive) に新規約適用 | ✅ |
 | B 検証 α | smoke test + doc 整合性 + 引き継ぎ作成 | ✅ |
 | B 検証 β | business-deepdive-agent で短時間 E2E（二幸産業 × 施設運営事業）、hooks 発火・task_state.json・subagent 動作実測 | ✅ (2026-05-02) |
-| **B 検証 γ** | **market-overview-agent で本格 E2E、context 削減効果 before/after 計測** | **⏳ 次セッション** |
-| Phase B 総括 | ISSUES.md / dependency_map.md / lever_mapping.md の最終確定、ISSUE-001 起票判断、β で発見した subagent return value 説明文混入 ISSUE の処理 | ⏳ γ 完了後 |
+| **B 検証 γ** | market-overview-agent で Step 1 限定 E2E、context 削減効果 before/after 計測 | ✅ (2026-05-03、削減 -20.4% 実測、wrapper bloat 残課題) |
+| Phase B 総括 | ISSUES.md / lever_mapping.md の最終確定、ISSUE-001 起票判断、β/γ で発見した subagent return value 規約遵守 ISSUE の処理 | ✅ (2026-05-03) |
 
 ---
 
@@ -213,13 +213,74 @@ Phase 3 で発生した「論点 5 に自社市場（ビルメンテ市場）を
 
 規約（`skills/_common/prompts/cross_topic_consistency_check.md` 相当 / business-deepdive SKILL.md の「論点間整合性ルール」）の効果を実証。
 
-### 2026-05-XX γ E2E 観察
+### 2026-05-03 γ E2E 観察（market-overview-agent / 国内タクシー市場・事業者のみ / Step 1 限定 Before/After 比較）
 
-- 対象: `<market>`
-- before token 数: `<...>`
-- after token 数: `<...>`
-- 削減率: `<...%>`
-- 品質差分: `<...>`
+#### 実行モード
+(α) 同一セッション内で Before → After を連続実行。Step 1 限定（Before の核心計測点）で比較し、Step 2-10 の deck generation はスキップ（両者同じ fill_*.py を使うため情報量が少ない）。
+
+#### 対象市場の選定
+plan 推奨どおり「国内タクシー市場（事業者のみ）」を採用。`scope_constraints.included_business_models = ["タクシー事業者"]` / `excluded_segments = ["配車アプリ事業者"]` を明示し、Step 0.5 はスキップ可と判断。
+
+#### 計測結果（最重要）
+
+| 計測点 | Messages | 増分 |
+|---|---|---|
+| T0 (Before 開始) | 100.1k | — |
+| T2 (Before Step 1 完了) | 188.5k | **+88.4k**（Before 値）|
+| T2.5 (After Step 1 開始 / git restore + install 後) | 224.8k | — |
+| T3 (After Step 1 完了) | 295.2k | **+70.4k**（After 値）|
+
+**After は Before より 18.0k tokens (-20.4%) 削減**。
+
+#### Before / After の処理対比
+
+| 項目 | Before（subagent なし） | After（subagent 経由） |
+|---|---|---|
+| 親 context での WebSearch 件数 | 20 | **0** |
+| subagent 内部 WebSearch 件数（隠蔽分） | — | **38-44** |
+| 検索結果の親 context 流入 | 全件（生スニペット） | なし |
+| 返り値の親 context 流入 | — | 6 subagent JSON（各 10-12k） |
+
+#### 期待外動作（重要、新規 ISSUE 候補）
+
+(A) 強化版 `.claude/agents/research-subagent.md`（コミット f828879）でも、**6 subagent すべてが JSON 外への混入を再発**:
+
+| 混入パターン | 件数 | 影響 |
+|---|---|---|
+| 前置き説明文（"Based on my comprehensive web research..." 等） | 6/6 | +500-1000 tokens の boilerplate |
+| マークダウン code fence (` ```json ` ～ ` ``` `) | 6/6 | json.loads 直接実行不可 |
+| JSON 後の `Sources:` トレーリング（重複出典リスト） | 4/6 | +200-500 tokens |
+| 二重 JSON 出力（`data_06` のみ、最深刻） | 1/6 | +5k tokens の重複コンテンツ |
+
+(A) のプロンプト強化は**期待通り機能しなかった**。原因仮説:
+- subagent モデル `haiku` の指示遵守率が弱い
+- 「最終出力チェックリスト」の self-check 5 項目が出力行動を変えるに至らない
+- LLM の「出典明示の親切心」が制約より優先される
+
+これらの結果、「subagent 化の理論上の context 削減効果 50% → 実測 20%」になった。残り 30% は wrapper bloat に食われている。
+
+#### 機能としての subagent 化の効果（成功側）
+
+- **生検索結果の完全隔離は達成**(Before 20 件分の生スニペットが親に流入 → After 0 件)
+- **subagent 内部の検索回数を増やしても親に響かない**(38-44 件 / 親 0 件)= research depth を上げる余地あり
+- 並列起動の所要時間は最大 84 秒（5 subagent 並列、1 subagent あたり 40-85 秒）
+
+#### Phase B 総括への提言（次の打ち手）
+
+| 改善策 | 期待効果 | 工数 | 優先度 |
+|---|---|---|---|
+| (B) 親側 JSON 抽出 helper（regex で `{...}` 抽出 + `data.*` 取り出し） | 削減効果 +10-15% (40% 程度まで改善見込み) | 1-2h | **高** |
+| (A2) research-subagent.md のさらなる強化 | 削減効果 +5% 程度 | 30 分 | 中 |
+| subagent モデル変更（haiku → sonnet） | 削減効果 +10-20% | コスト 4-5x | 低（コスト面） |
+| 二重 JSON 防止（data_06 のような事故）の hard guard | edge case 防止 | 1h | 中 |
+
+新規 ISSUE-009（ISSUES.md に登録）として追跡。
+
+#### 計測ログの保管場所
+- `outputs/harness_check/measurements.md`(本セッションで作成、計測値の確定版)
+- Before 成果物: `work/market-overview-agent/2026-05-03_taxi_industry_operators_BEFORE/`(scope.json + 6 data files)
+- After 成果物: `work/market-overview-agent/2026-05-03_taxi_industry_operators_AFTER/`(scope.json + 6 data files)
+- これらは `outputs/` / `work/` 配下のため gitignore 対象（コミットしない）
 
 ---
 
@@ -227,10 +288,10 @@ Phase 3 で発生した「論点 5 に自社市場（ビルメンテ市場）を
 
 | ID | 状態 | 関連 |
 |---|---|---|
-| ISSUE-001 (`@import` 機構) | 保留 / トリガー条件 1 達成 (2026-05-02) | β / γ で同期漏れインシデントが顕在化したら起票判断 |
-| 検証 β | **完了 (2026-05-02)** | Section 5 観察ログ参照、Phase B 規約は本流で機能 |
-| 検証 γ | 未実施 | 次セッション、market-overview-agent で context 削減効果を実測 |
-| ISSUE 候補（β で発見）: subagent return value に説明文混入 | 起票候補 | Section 5「期待外動作」参照。`research-subagent.md` 制約強化 or 親側 JSON 抽出 helper を要検討 |
+| ISSUE-001 (`@import` 機構) | 継続保留 (2026-05-03 確定) | β / γ でも同期漏れ 0/3 のまま、ファイル数 9 で安定運用。v0.4 以降に 12 ファイル超過 or 同期漏れ発生時に起票検討 |
+| 検証 β | **完了 (2026-05-02)** | Section 5「2026-05-02 β E2E 観察」参照、Phase B 規約は本流で機能 |
+| 検証 γ | **完了 (2026-05-03)** | Section 5「2026-05-03 γ E2E 観察」参照、After は Before より -20.4% 削減（理論値 -50% に対し wrapper bloat で半減） |
+| **ISSUE-009 (新規起票)**: subagent return value 規約遵守不完全 | 保留 / P2 (ISSUES.md 登録済) | (A) 強化版でも 6/6 件で混入再発。v0.4 で (B) 親側 JSON 抽出 helper の着手検討 |
 | commit author 自動検出の不安定さ | 既知の事象 | hostname 一時変動時に再発の可能性、Section 3-1 参照 |
 | ブランチ意図せぬ切替 | 既知の事象、原因不明 | Section 3-2 参照 |
 

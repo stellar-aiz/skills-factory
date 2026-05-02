@@ -246,3 +246,50 @@
 
 ### 次セッションでの目標
 β / γ E2E 実施で 🟡 → 🟢 への昇格を目指す。少なくとも `#1 ① / #4 ① / #8 ① / #9 ①` の hooks 系と `#1 ② / #3 ② / #4 ②` の subagent 系は 🟢 に上がる見込み。詳細は `docs/harness_check/handoff.md` Section 2 / `~/.claude/plans/harness-check-verification-next-session.md` 参照。
+
+---
+
+## Phase B 完了時の **最終実 Status**(2026-05-03 / β + γ E2E 完了後)
+
+β（business-deepdive-agent / 二幸産業 × 施設運営事業）と γ（market-overview-agent / 国内タクシー市場 Step 1 限定 Before/After 比較）の E2E 実測結果に基づく最終 Status。
+
+| # | 原則 | ① | ② | ③ | β/γ で確認した動作 |
+|---|---|---|---|---|---|
+| 1 | ツール呼び出し | 🟢 | 🟢 | 🟢 | β で hook 発火確認、γ で subagent 経由の構造化 JSON 返却確認 |
+| 2 | プロンプト管理 | 🟢 | 🟢 | N/A | 元から達成 |
+| 3 | コンテキスト制御 | 🟡 ⁶ | 🟡 ⁷ | 🟢 | ⁶ description 精緻化は実装済だが LLM 発火抑制の定量測定なし / ⁷ γ で 38-44 件の生検索結果隔離確認も、return value wrapper bloat で削減効果は理論値 50% → 実測 20% |
+| 4 | 構造化出力 | 🟢 | 🟢 | N/A | β / γ で fill_*.py / subagent JSON return が機能 |
+| 5 | 状態統合 | 🟢 | 🟢 | 🟢 | β で task_state.json 7 step 全記録確認 |
+| 6 | 開始停止再開 | 🟡 ⁸ | 🟢 | 🟢 | ⁸ resume シナリオは β / γ で発生せず（一気通貫実行）、運用での確認待ち |
+| 7 | 人間との対話 | N/A | 🟢 | 🟢 | 元から達成 |
+| 8 | 制御フロー | 🟢 | 🟡 | 🟢 | β で AskUserQuestion / TaskUpdate 確認、subagent 順序起動も論点 4→5 で機能 |
+| 9 | エラー圧縮 | 🟡 ⁹ | 🟢 | N/A | ⁹ β / γ で実エラー発生せず PostToolUse hook 発火なし、unit test 範囲のみ |
+| 10 | 責務サイズ | 🟡 (規約) | 🟡 (部分分割) | 🟡 | 元計画通り、本フェーズで満点目指さず |
+| 11 | どこからでも起動 | 🟡 | N/A | N/A | レバー④ 対応の別フェーズ（本フェーズ範囲外） |
+| 12 | ステートレス | 🟢 | 🟢 | 🟢 | β で scope.json + task_state.json + data_NN_*.json の状態外部化を全 step で確認 |
+
+### 集計
+- 🟢: 18（元から達成 6 + β/γ で昇格 12）
+- 🟡: 7（実装済だが効果未測定 or 想定通り未達）
+- 🔴: 0
+- N/A: 11
+
+🔴 ゼロ達成。期待 Status 24 グリーンに対し実測 18 グリーンで、**75% 達成**。
+
+### γ で発見した重要事象（残課題）
+
+**subagent return value の wrapper bloat 問題**（#3 ② が 🟢 に届かない理由）:
+
+| 観察 | 件数 | 効果 |
+|---|---|---|
+| (A) 強化版 research-subagent.md でも、6 subagent 全てが JSON 外混入を再発 | 6/6 | preamble + code fence + Sources trailing |
+| 二重 JSON 出力（最深刻、`data_06`） | 1/6 | +5k tokens の重複 |
+| 結果として After Step 1 削減効果 | -20.4%(理論値 -50%) | wrapper bloat が削減量を半減 |
+
+**subagent 機能自体は動作している**(38-44 件の生検索結果は完全隔離) が、return value 規約遵守の弱さで実効性に課題あり。**新規 ISSUE 候補**(ISSUES.md 参照): (B) 親側 JSON 抽出 helper の実装を v0.4 で検討。
+
+### 凡例
+
+- 🟢: 実装 + β / γ E2E で実動作確認済
+- 🟡: 実装済だが効果未測定 / 部分達成
+- 🔴: 未対応 / 期待外
