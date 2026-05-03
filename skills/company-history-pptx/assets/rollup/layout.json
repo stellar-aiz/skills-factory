@@ -1,0 +1,3 @@
+{
+  "_comment": "V1 placeholder — Rollup brand falls back to stellar_aiz template via brand_resolver.template_path(). slide_height is derived at runtime from prs.slide_height so layout calculations match the actual template. V2 will introduce a curated A4-landscape Rollup template."
+}
