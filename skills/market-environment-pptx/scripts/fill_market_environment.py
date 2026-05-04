@@ -110,6 +110,25 @@ COLOR_SUBTITLE = RGBColor(0x33, 0x33, 0x33)  # default = text; reassigned in _ap
 _THEME = None
 
 
+def _body_pt(stella_fallback_pt):
+    """本文・表・チャート要素フォントの brand 別解決ヘルパー。
+
+    Roleup: theme.font_size_body_pt (= 10pt 統一)。ユーザー指示
+      「タイトル/キーメッセージ/サブタイトル/出典 以外は 10pt」に準拠。
+    Stella: 旧 hardcode 値を維持(regression-zero)。
+    """
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        return Pt(stella_fallback_pt)
+    return _THEME.pt("font_size_body_pt")
+
+
+def _body_sz(stella_fallback_sz_str):
+    """OOXML sz 属性 (100×pt の文字列) 用の brand 別解決ヘルパー。"""
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        return stella_fallback_sz_str
+    return str(_THEME.pt_value("font_size_body_pt") * 100)
+
+
 def _palette_color(index: int, total: int) -> str:
     if total <= 1:
         return CHART_PALETTE[0]
@@ -170,6 +189,21 @@ def set_textbox_text(shape, text):
 def remove_shape(slide, name):
     s = find_shape(slide, name)
     if s: slide.shapes._spTree.remove(s._element); print(f"  ✓ Removed '{name}'")
+
+def _silent_remove_shape(slide, name):
+    """find_shape の warning を出さずに削除を試みる(brand 別 shape 名フォールバック用)"""
+    for s in slide.shapes:
+        if s.name == name:
+            slide.shapes._spTree.remove(s._element)
+            return True
+    return False
+
+def _silent_find_shape(slide, name):
+    """find_shape の warning を出さずに検索する(brand 別 shape 名フォールバック用)"""
+    for s in slide.shapes:
+        if s.name == name:
+            return s
+    return None
 
 def _hex2rgb(h):
     h = h.replace("#","")
@@ -410,8 +444,9 @@ def build_stacked_combo_chart(slide, cfg, left, top, w, h):
         pp = p.find(qn('a:pPr'))
         if pp is None: pp = etree.SubElement(p, qn('a:pPr'))
         dr = pp.find(qn('a:defRPr'))
-        if dr is None: dr = etree.SubElement(pp, qn('a:defRPr'), attrib={'sz':'1100'})
-        else: dr.set('sz','1100')
+        ax_sz = _body_sz('1100')  # roleup: 10pt 統一 / stella: 11pt 維持
+        if dr is None: dr = etree.SubElement(pp, qn('a:defRPr'), attrib={'sz': ax_sz})
+        else: dr.set('sz', ax_sz)
         if dr.find(qn('a:latin')) is None: etree.SubElement(dr, qn('a:latin'), attrib={'typeface':FONT_JP})
         if dr.find(qn('a:ea')) is None: etree.SubElement(dr, qn('a:ea'), attrib={'typeface':FONT_JP})
 
@@ -486,7 +521,7 @@ def add_unit_label(slide, text, left, top, width=None, height=None):
         height = Inches(0.25)
     tb = slide.shapes.add_textbox(left, top, width, height)
     p = tb.text_frame.paragraphs[0]; p.alignment = PP_ALIGN.LEFT
-    r = p.add_run(); r.text = text; r.font.size = Pt(11)
+    r = p.add_run(); r.text = text; r.font.size = _body_pt(11)
     r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
 
 def add_custom_legend(slide, cfg, left, top, w):
@@ -504,7 +539,7 @@ def add_custom_legend(slide, cfg, left, top, w):
         tb = slide.shapes.add_textbox(tx, int(top), Inches(1.0), lh)
         tb.text_frame.word_wrap = False
         r = tb.text_frame.paragraphs[0].add_run()
-        r.text = lc["series_name"]; r.font.size = Pt(11); r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
+        r.text = lc["series_name"]; r.font.size = _body_pt(11); r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
         ix = tx + Inches(1.0) + Inches(0.15)
     n_bars_total = len(bars)
     for sb_idx, sb in enumerate(bars):
@@ -515,7 +550,7 @@ def add_custom_legend(slide, cfg, left, top, w):
         tb = slide.shapes.add_textbox(tx, int(top), Inches(1.5), lh)
         tb.text_frame.word_wrap = False
         r = tb.text_frame.paragraphs[0].add_run()
-        r.text = sb["series_name"]; r.font.size = Pt(11); r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
+        r.text = sb["series_name"]; r.font.size = _body_pt(11); r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
         ix = tx + Inches(1.5) + Inches(0.10)
     print("  ✓ 凡例")
 
@@ -529,7 +564,7 @@ def add_cagr_annotations(slide, cfg, left, top, w):
         tb = slide.shapes.add_textbox(left, int(y), w, Inches(0.25))
         tb.text_frame.word_wrap = True
         r = tb.text_frame.paragraphs[0].add_run()
-        r.text = ann.get("label",""); r.font.size = Pt(11); r.font.bold = True
+        r.text = ann.get("label",""); r.font.size = _body_pt(11); r.font.bold = True
         r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
         ln = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, int(y+Inches(0.25)), w, Inches(0.015))
         ln.fill.solid(); ln.fill.fore_color.rgb = COLOR_TEXT; ln.line.fill.background()
@@ -537,12 +572,12 @@ def add_cagr_annotations(slide, cfg, left, top, w):
         for it in ann.get("items",[]):
             nb = slide.shapes.add_textbox(left, int(y), Inches(1.1), Inches(0.28))
             r = nb.text_frame.paragraphs[0].add_run()
-            r.text = f"{it['name']}："; r.font.size = Pt(11)
+            r.text = f"{it['name']}："; r.font.size = _body_pt(11)
             r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
             vb = slide.shapes.add_textbox(int(left+Inches(1.1)), int(y), int(w-Inches(1.1)), Inches(0.28))
             vb.text_frame.paragraphs[0].alignment = PP_ALIGN.RIGHT
             r = vb.text_frame.paragraphs[0].add_run()
-            r.text = it['value']; r.font.size = Pt(15); r.font.bold = True
+            r.text = it['value']; r.font.size = _body_pt(15); r.font.bold = True
             r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
             y += Inches(0.30)
         y += Inches(0.15)
@@ -612,7 +647,7 @@ def add_growth_annotations(slide, cfg, cl, ct, cw, ch):
         ov.text_frame.word_wrap = False
         ov.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
         r = ov.text_frame.paragraphs[0].add_run()
-        r.text = val; r.font.size = Pt(14); r.font.bold = True
+        r.text = val; r.font.size = _body_pt(14); r.font.bold = True
         r.font.color.rgb = COLOR_TEXT; r.font.name = FONT_JP
     print(f"  ✓ CAGR注釈: {len(gas)}個")
 
@@ -695,8 +730,19 @@ def main():
     sub_text = resolve_subtitle_text(data, theme) or "市場環境分析"
     set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
     src = data.get("source","")
-    if src: set_textbox_text(find_shape(slide, SHAPE_SOURCE), f"出典：{src}")
-    remove_shape(slide, SHAPE_CONTENT_AREA)
+    if src:
+        # roleup 公式テンプレでは shape 名が "Source 3"。stella は "Source"。
+        # 両方を試して見つかった方を更新する(silent fallback)。
+        src_shape = _silent_find_shape(slide, SHAPE_SOURCE) or _silent_find_shape(slide, "Source 3")
+        if src_shape is not None:
+            set_textbox_text(src_shape, f"出典：{src}")
+        else:
+            print(f"  ⚠ Source shape not found (tried '{SHAPE_SOURCE}', 'Source 3')", file=sys.stderr)
+    # ガイド矩形(チャート位置決め用)を除去:
+    #   stella: "Content Area" / roleup: "正方形/長方形 1"(茶色 accent2)
+    # 出力ではマスター背景(白)が見えるよう両方 silent に削除を試みる。
+    _silent_remove_shape(slide, SHAPE_CONTENT_AREA)
+    _silent_remove_shape(slide, "正方形/長方形 1")
 
     cfg = data.get("chart", {})
     ul = cfg.get("unit_label","")

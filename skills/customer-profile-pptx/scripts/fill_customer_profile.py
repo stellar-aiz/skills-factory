@@ -133,6 +133,25 @@ FONT_SIZE_SOURCE = Pt(10)
 _THEME = None
 
 
+def _body_pt(stella_fallback_pt):
+    """本文・表・チャート要素フォントの brand 別解決ヘルパー。
+
+    Roleup: theme.font_size_body_pt (= 10pt 統一)。ユーザー指示
+      「タイトル/キーメッセージ/サブタイトル/出典 以外は 10pt」に準拠。
+    Stella: 旧 hardcode 値を維持(regression-zero)。
+    """
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        return Pt(stella_fallback_pt)
+    return _THEME.pt("font_size_body_pt")
+
+
+def _body_sz(stella_fallback_sz_str):
+    """OOXML sz 属性 (100×pt の文字列) 用の brand 別解決ヘルパー。"""
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        return stella_fallback_sz_str
+    return str(_THEME.pt_value("font_size_body_pt") * 100)
+
+
 def _apply_theme(theme):
     """Reassign module-level brand-aware globals from a resolved BrandTheme.
 
@@ -214,6 +233,15 @@ def remove_shape(slide, name):
         sp_tree = slide.shapes._spTree
         sp_tree.remove(shape._element)
         print(f"  ✓ Shape '{name}' removed")
+
+
+def _silent_remove_shape(slide, name):
+    """find_shape の warning を出さずに削除を試みる(brand 別 shape 名フォールバック用)"""
+    for shape in slide.shapes:
+        if shape.name == name:
+            slide.shapes._spTree.remove(shape._element)
+            return True
+    return False
 
 
 def add_section_title(slide, text, left, top, width):
@@ -570,10 +598,11 @@ def build_combo_chart(slide, perf_data, left, top, width, height):
         if pPr is None:
             pPr = etree.SubElement(p, qn('a:pPr'))
         defRPr = pPr.find(qn('a:defRPr'))
+        ax_sz = _body_sz('1100')  # roleup: 10pt 統一 / stella: 11pt 維持
         if defRPr is None:
-            defRPr = etree.SubElement(pPr, qn('a:defRPr'), attrib={'sz': '1100'})
+            defRPr = etree.SubElement(pPr, qn('a:defRPr'), attrib={'sz': ax_sz})
         else:
-            defRPr.set('sz', '1100')
+            defRPr.set('sz', ax_sz)
         # フォント指定
         if defRPr.find(qn('a:latin')) is None:
             etree.SubElement(defRPr, qn('a:latin'), attrib={'typeface': FONT_NAME_JP})
@@ -634,7 +663,7 @@ def add_data_labels_to_ser(ser_xml, position='outEnd', num_format='0.0', font_co
     etree.SubElement(txPr, qn('a:lstStyle'))
     p = etree.SubElement(txPr, qn('a:p'))
     pPr = etree.SubElement(p, qn('a:pPr'))
-    defRPr = etree.SubElement(pPr, qn('a:defRPr'), attrib={'sz': '1200'})
+    defRPr = etree.SubElement(pPr, qn('a:defRPr'), attrib={'sz': _body_sz('1200')})
     latin = etree.SubElement(defRPr, qn('a:latin'), attrib={'typeface': FONT_NAME_JP})
     ea = etree.SubElement(defRPr, qn('a:ea'), attrib={'typeface': FONT_NAME_JP})
     sf = etree.SubElement(defRPr, qn('a:solidFill'))
@@ -734,7 +763,7 @@ def add_cagr_annotation(slide, perf_data, chart_left, chart_top, chart_width, ch
     p.alignment = PP_ALIGN.CENTER
     run = p.add_run()
     run.text = cagr_text
-    run.font.size = Pt(16)
+    run.font.size = _body_pt(16)
     run.font.bold = True
     run.font.color.rgb = COLOR_TEXT
     run.font.name = FONT_NAME_JP
@@ -756,19 +785,30 @@ def add_unit_label(slide, text, left, top, width, height=None):
     p.alignment = PP_ALIGN.LEFT
     run = p.add_run()
     run.text = text
-    run.font.size = Pt(12)
+    run.font.size = _body_pt(12)
     run.font.color.rgb = COLOR_TEXT
     run.font.name = FONT_NAME_JP
 
 
-def add_custom_legend(slide, perf_data, left, top, width):
-    """カスタム凡例を右寄せで配置（■売上高  ●━営業利益率）"""
+def add_custom_legend(slide, perf_data, left, top, width, max_right_emu=None):
+    """カスタム凡例を右寄せで配置（■売上高  ●━営業利益率）。
+
+    Args:
+        max_right_emu: 凡例の右端許容上限(EMU)。指定時は凡例右端をこの値で制限し、
+                       同じ Y 行に置かれる他要素(unit_label 等)との水平方向の被りを
+                       自動回避する。None の場合は left+width に右寄せ(従来挙動)。
+    """
     bar_label = perf_data.get("bar_label", "売上高")
     line_label = perf_data.get("line_label", "営業利益率")
 
     legend_w = Inches(2.80)
     legend_h = Inches(0.22)
-    legend_x = left + width - legend_w  # 右寄せ
+    preferred_right = left + width
+    if max_right_emu is not None and max_right_emu < preferred_right:
+        legend_right = max_right_emu
+    else:
+        legend_right = preferred_right
+    legend_x = legend_right - legend_w  # 右寄せ(or max_right で制限)
 
     # 凡例の小さい四角（売上高）
     sq_size = Inches(0.14)
@@ -793,7 +833,7 @@ def add_custom_legend(slide, perf_data, left, top, width):
     p1.alignment = PP_ALIGN.LEFT
     run1 = p1.add_run()
     run1.text = bar_label
-    run1.font.size = Pt(12)
+    run1.font.size = _body_pt(12)
     run1.font.color.rgb = COLOR_TEXT
     run1.font.name = FONT_NAME_JP
 
@@ -832,7 +872,7 @@ def add_custom_legend(slide, perf_data, left, top, width):
     p2.alignment = PP_ALIGN.LEFT
     run2 = p2.add_run()
     run2.text = line_label
-    run2.font.size = Pt(12)
+    run2.font.size = _body_pt(12)
     run2.font.color.rgb = COLOR_TEXT
     run2.font.name = FONT_NAME_JP
 
@@ -924,6 +964,12 @@ def main():
     # 3. 既存テーブルを削除
     remove_shape(slide, "Table 1")
 
+    # 3b. roleup 公式テンプレ由来のチャート位置ガイド矩形(茶色 accent2)を出力から除去。
+    #     ガイドはチャート寸法の参考にすぎず、出力ではマスター背景(白)が見えるべき。
+    #     stella テンプレにはこれらの shape 名が存在しないため silent no-op で安全。
+    _silent_remove_shape(slide, "正方形/長方形 1")
+    _silent_remove_shape(slide, "正方形/長方形 8")
+
     # 4. 左側: 企業の概要
     overview = data.get("company_overview", {})
     section_title_left = overview.get("section_title", "企業の概要")
@@ -942,15 +988,21 @@ def main():
     # stella: 既存通り chart 左上 (RIGHT_X, panel_y+0.35) に幅 2.50 in。
     # roleup: ユーザー視覚調整 (2026-05-04) で chart 右上 (9.75, 1.99) に幅 1.53 in。
     unit_label = perf.get("unit_label", "")
+    legend_max_right = None  # roleup 時は unit_label の左端で制限し凡例被りを自動回避
     if unit_label:
         if _THEME is not None and _THEME.id != "stellar_aiz":
-            add_unit_label(slide, unit_label, Inches(9.75), Inches(1.99),
+            unit_label_left = Inches(9.75)
+            add_unit_label(slide, unit_label, unit_label_left, Inches(1.99),
                            Inches(1.53), height=Inches(0.27))
+            # 凡例右端は unit_label 左端 - margin (0.10 in) まで。
+            # stella は unit_label が chart 左上に配置されるため凡例(右端)と被らず制約不要。
+            legend_max_right = unit_label_left - Inches(0.10)
         else:
             add_unit_label(slide, unit_label, RIGHT_X, PANEL_Y + Inches(0.35), Inches(2.50))
 
     # カスタム凡例（右側）
-    add_custom_legend(slide, perf, RIGHT_X, PANEL_Y + Inches(0.35), RIGHT_W)
+    add_custom_legend(slide, perf, RIGHT_X, PANEL_Y + Inches(0.35), RIGHT_W,
+                      max_right_emu=legend_max_right)
 
     # 複合チャート位置:
     # roleup: ユーザー視覚調整 (2026-05-04) で chart_top = panel_y + 0.95 = 2.46 に固定。
