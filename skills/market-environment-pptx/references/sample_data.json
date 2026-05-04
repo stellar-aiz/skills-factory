@@ -1,9 +1,11 @@
 {
   "main_message": "建設工事業の完成工事高は全国的に堅調に推移しており、市場環境の安定性を評価すべき",
   "chart_title": "建設工事業の完成工事高の推移（全国）",
+  "section_title": "市場規模の推移",
   "source": "国土交通省「建設工事施工統計調査」",
   "chart": {
     "unit_label": "（単位：兆円、%）",
+    "fiscal_year_end_month": 12,
     "num_format": "0.0",
     "y_axis_label": "",
     "stacked_bars": [

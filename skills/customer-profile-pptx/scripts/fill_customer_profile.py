@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
 from format_helpers import (  # noqa: E402
     apply_line_spacing,
+    format_fiscal_period,
     require_source,
     resolve_top_text,
     resolve_subtitle_text,
@@ -231,13 +232,15 @@ def add_section_title(slide, text, left, top, width):
     run.font.color.rgb = COLOR_SUBTITLE
     run.font.name = FONT_NAME_JP
 
-    # 下線を追加
-    txBox2 = slide.shapes.add_shape(
-        MSO_SHAPE.RECTANGLE, left, top + Inches(0.30), width, Inches(0.02)
-    )
-    txBox2.fill.solid()
-    txBox2.fill.fore_color.rgb = COLOR_TEXT
-    txBox2.line.fill.background()
+    # 下線: stella では既存通り (黒) を引く。roleup では公式 'object 8' (薄茶色) が
+    # テンプレに既に存在するため、ここでは下線を追加しない (重複回避)。
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        txBox2 = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE, left, top + Inches(0.30), width, Inches(0.02)
+        )
+        txBox2.fill.solid()
+        txBox2.fill.fore_color.rgb = COLOR_TEXT
+        txBox2.line.fill.background()
     return txBox
 
 
@@ -249,11 +252,20 @@ def build_overview_table(slide, items, left, top, width):
     col1_w = width - col0_w
 
     # 行の最小高さ — PPTがテキスト折り返しに応じて自動拡張する。
-    # brand に line_height_pt があれば余白込みで動的計算 (roleup 12pt → 0.20in 程度)、
-    # なければ stella の既存値 0.35in (14pt 行) を維持。
+    # roleup: line_height_pt+4pt を最低限とし、利用可能スペースに余裕があれば
+    #   均等に拡張して縦方向を充足させる(panel 内の空白を防ぐ)。
+    # stella: 既存値 0.35in (14pt 行) を維持して regression-zero。
     if _THEME is not None and _THEME.line_height_pt() is not None:
-        # 12pt 行 + 4pt 余白 = 16pt = 0.222in
-        min_row_h = Inches((_THEME.line_height_pt() + 4) / 72.0)
+        min_floor = Inches((_THEME.line_height_pt() + 4) / 72.0)  # 12pt 行 + 4pt 余白
+        section_title_h = Inches(0.40)
+        bottom_margin = Inches(0.05)
+        available_h = SOURCE_Y - PANEL_Y - section_title_h - bottom_margin
+        total_min_h = min_floor * n_rows
+        if total_min_h < available_h:
+            extra_per_row = (available_h - total_min_h) / n_rows
+            min_row_h = min_floor + extra_per_row
+        else:
+            min_row_h = min_floor
     else:
         min_row_h = Inches(0.35)
     table_h = min_row_h * n_rows
@@ -379,7 +391,14 @@ def build_combo_chart(slide, perf_data, left, top, width, height):
     line_label = perf_data.get("line_label", "営業利益率")
 
     chart_data = CategoryChartData()
-    chart_data.categories = [d["year"] for d in data]
+    # categories: roleup なら "YY/MM期" (公式 vF 例: "23/07期")、stella は西暦 4 桁を維持
+    if _THEME is not None and _THEME.fiscal_period_format():
+        fy_month = perf_data.get("fiscal_year_end_month", 12)
+        chart_data.categories = [
+            format_fiscal_period(int(d["year"]), fy_month, _THEME) for d in data
+        ]
+    else:
+        chart_data.categories = [d["year"] for d in data]
     chart_data.add_series(bar_label, [d["revenue"] for d in data])
     chart_data.add_series(line_label, [d["op_margin"] for d in data])
 
@@ -921,8 +940,16 @@ def main():
     # カスタム凡例（右側）
     add_custom_legend(slide, perf, RIGHT_X, PANEL_Y + Inches(0.35), RIGHT_W)
 
-    # 複合チャート
-    chart_top = PANEL_Y + Inches(0.55)
+    # 複合チャート — 利用可能スペースの垂直中央に配置。
+    # available = SOURCE_Y(下端) - PANEL_Y - section_title_h(0.40) - bottom_margin(0.05)
+    # stella の既存値: 1.50 + 0.55 = 2.05 と一致する数値設計 (regression-zero)。
+    section_title_h = Inches(0.40)
+    bottom_margin = Inches(0.05)
+    available_top = PANEL_Y + section_title_h
+    available_bottom = SOURCE_Y - bottom_margin
+    chart_top = available_top + ((available_bottom - available_top) - CHART_H) // 2
+    if chart_top < available_top:
+        chart_top = available_top  # 下限保証
     chart_frame = build_combo_chart(slide, perf, RIGHT_X, chart_top, RIGHT_W, CHART_H)
 
     # CAGR注釈

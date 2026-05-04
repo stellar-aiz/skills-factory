@@ -25,6 +25,7 @@
     "unit_label": "（単位：十億円、%）",
     "bar_label": "売上高",
     "line_label": "営業利益率",
+    "fiscal_year_end_month": 7,
     "data": [
       {"year": "2013", "revenue": 10.9, "op_margin": 4.6},
       {"year": "2014", "revenue": 11.9, "op_margin": 4.6},

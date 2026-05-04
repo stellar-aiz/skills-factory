@@ -1,10 +1,10 @@
 {
-  "_comment": "Phase 3 — A4 横 (11.693×8.268 in) 公式テンプレ slide3 (レイアウト①: フルワイド) から逆算。subtitle (0.42,1.51,5.44,0.36) → panel_y=1.51, content area (0.41,1.92,10.88,5.64), source (0.41,7.57,10.88,0.44). chart は左 8.00 inch (chart_x=0.41), 右に CAGR 注釈枠 2.80 inch (cagr_x=8.50) を配置。chart top = 1.51+0.55 = 2.06, chart_h=5.20 で source 7.57 直前まで",
+  "_comment": "Phase 4 (2026-05-04) — A4 横 (11.693×8.268 in) 公式テンプレ slide3 (レイアウト①: フルワイド) から逆算。subtitle (0.42,1.51,5.44,0.36) → panel_y=1.51, content area (0.41,1.92,10.88,5.64), source (0.41,7.57,10.88,0.44). roleup ではsubtitle (12pt, panel_y) と凡例 (panel_y+0.40, 高さ 0.30) を重ねないよう chart_y_offset_in を 0.85 に拡張。chart_h=5.20 で chart top=2.36, chart bottom=7.56 → source 7.57 直前。chart は左 8.00 inch (chart_x=0.41), 右に CAGR 注釈枠 2.80 inch (cagr_x=8.50) を配置。",
   "panel_y_in": 1.51,
   "chart_x_in": 0.41,
   "chart_w_in": 8.00,
   "chart_h_in": 5.20,
-  "chart_y_offset_in": 0.55,
+  "chart_y_offset_in": 0.85,
   "cagr_x_in": 8.50,
   "cagr_w_in": 2.80
 }

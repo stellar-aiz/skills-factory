@@ -21,7 +21,11 @@ import argparse, copy, json, math, os, sys
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
-from format_helpers import resolve_top_text, resolve_subtitle_text  # noqa: E402
+from format_helpers import (  # noqa: E402
+    format_fiscal_period,
+    resolve_top_text,
+    resolve_subtitle_text,
+)
 
 SKILL_ID = "market-environment-pptx"
 
@@ -99,6 +103,11 @@ LABEL_BAR_COLOR = "#4E79A7"
 LABEL_BG_COLOR = "#E8EEF5"
 
 FONT_JP = "Meiryo UI"
+COLOR_SUBTITLE = RGBColor(0x33, 0x33, 0x33)  # default = text; reassigned in _apply_theme
+
+# Phase 4 (ISSUE-011): module-level theme reference so chart helpers can read
+# fiscal_period_format / line_height_pt / layout_rule without an extra parameter.
+_THEME = None
 
 
 def _palette_color(index: int, total: int) -> str:
@@ -115,9 +124,11 @@ def _apply_theme(theme):
     go through main() (regression safety net).
     """
     global PANEL_Y, CHART_X, CHART_W, CHART_H, CHART_Y, CAGR_X, CAGR_W
-    global COLOR_TEXT, COLOR_SOURCE
+    global COLOR_TEXT, COLOR_SOURCE, COLOR_SUBTITLE
     global CHART_PALETTE, OTHER_COLOR, TARGET_COLOR, LABEL_BAR_COLOR, LABEL_BG_COLOR
     global FONT_JP
+    global _THEME
+    _THEME = theme
 
     PANEL_Y = theme.layout("panel_y_in")
     CHART_X = theme.layout("chart_x_in")
@@ -127,8 +138,9 @@ def _apply_theme(theme):
     CAGR_X  = theme.layout("cagr_x_in")
     CAGR_W  = theme.layout("cagr_w_in")
 
-    COLOR_TEXT   = theme.color("text")
-    COLOR_SOURCE = theme.color("source")
+    COLOR_TEXT     = theme.color("text")
+    COLOR_SOURCE   = theme.color("source")
+    COLOR_SUBTITLE = theme.color("subtitle")  # roleup #897141 / stella #333333 (= text)
 
     CHART_PALETTE   = list(theme.chart_palette)
     OTHER_COLOR     = theme.hex("highlight_other")
@@ -267,7 +279,12 @@ def build_stacked_combo_chart(slide, cfg, left, top, w, h):
     n_ser     = len(bars_cfg)
 
     cd = CategoryChartData()
-    cd.categories = [d["year"] for d in data]
+    # categories: roleup なら "YY/MM期" (公式 vF 例)、stella は西暦 4 桁を維持
+    if _THEME is not None and _THEME.fiscal_period_format():
+        fy_month = cfg.get("fiscal_year_end_month", 12)
+        cd.categories = [format_fiscal_period(int(d["year"]), fy_month, _THEME) for d in data]
+    else:
+        cd.categories = [d["year"] for d in data]
     for si, sb in enumerate(bars_cfg):
         cd.add_series(sb["series_name"],
                       [d["bars"][si] if si < len(d.get("bars",[])) else 0 for d in data])
@@ -431,6 +448,31 @@ def _add_dlbls(ser, pos, fmt, fc, sz):
     etree.SubElement(sf, qn('a:srgbClr'), attrib={'val':fc})
 
 # ── 注釈・凡例 ──
+def add_section_subtitle(slide, text, left, top, width, theme):
+    """サブタイトル(セクション見出し)を動的 textbox で配置。
+
+    customer-profile/add_section_title 相当の機能だが、
+    market-environment は section_title フィールドが任意のため、
+    呼び出し側で `if text` でガードする想定。
+
+    色・align は theme.subtitle / layout_rule(subtitle_align) 由来。
+    roleup: 12pt 左寄せ #897141 / stella: 14pt 中央寄せ #333333。
+    """
+    txBox = slide.shapes.add_textbox(left, top, width, Inches(0.30))
+    tf = txBox.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    align_str = theme.layout_rule("subtitle_align", "center")
+    p.alignment = PP_ALIGN.LEFT if align_str == "left" else PP_ALIGN.CENTER
+    run = p.add_run()
+    run.text = text
+    run.font.size = theme.pt("font_size_section_pt")
+    run.font.bold = True
+    run.font.color.rgb = theme.color("subtitle")
+    run.font.name = theme.font_ea
+    return txBox
+
+
 def add_unit_label(slide, text, left, top):
     tb = slide.shapes.add_textbox(left, top, Inches(3.0), Inches(0.25))
     p = tb.text_frame.paragraphs[0]; p.alignment = PP_ALIGN.LEFT
@@ -649,7 +691,17 @@ def main():
     cfg = data.get("chart", {})
     ul = cfg.get("unit_label","")
     if ul: add_unit_label(slide, ul, CHART_X, PANEL_Y)
-    add_custom_legend(slide, cfg, CHART_X, PANEL_Y + Inches(0.25), CHART_W)
+
+    # サブタイトル(セクション見出し): roleup のみ表示。stella は section_title field 未使用で
+    # regression-zero (sample_data.json に存在しても表示しない)。
+    section_title = data.get("section_title", "")
+    if section_title and theme.id != "stellar_aiz":
+        add_section_subtitle(slide, section_title, CHART_X, PANEL_Y, CHART_W + CAGR_W, theme)
+
+    # 凡例位置: stella は既存通り PANEL_Y + 0.25。
+    # roleup は subtitle (PANEL_Y) と重ならないよう PANEL_Y + 0.40 に下げる。
+    legend_top = PANEL_Y + (Inches(0.40) if theme.id != "stellar_aiz" else Inches(0.25))
+    add_custom_legend(slide, cfg, CHART_X, legend_top, CHART_W)
     build_stacked_combo_chart(slide, cfg, CHART_X, CHART_Y, CHART_W, CHART_H)
     add_period_separator(slide, cfg, CHART_X, CHART_Y, CHART_W, CHART_H)
     add_growth_annotations(slide, cfg, CHART_X, CHART_Y, CHART_W, CHART_H)
