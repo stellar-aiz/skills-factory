@@ -36,13 +36,13 @@
     "#CDCECE"
   ],
   "defaults": {
-    "font_size_label_pt": 14,
-    "font_size_value_pt": 14,
-    "font_size_section_pt": 14,
+    "font_size_label_pt": 10,
+    "font_size_value_pt": 10,
+    "font_size_section_pt": 12,
     "font_size_chart_title_pt": 11,
     "font_size_data_label_pt": 11,
     "font_size_legend_pt": 12,
-    "font_size_source_pt": 10,
+    "font_size_source_pt": 6,
     "font_size_axis_pt": 11,
     "font_size_cagr_pt": 16,
 

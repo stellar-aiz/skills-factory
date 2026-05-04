@@ -41,6 +41,10 @@ from lxml import etree
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import apply_line_spacing, require_source  # noqa: E402
+
+SKILL_ID = "customer-profile-pptx"
+SHAPE_SOURCE = "Source 3"   # rollup template only; stella falls back to add_textbox
 
 def _finalize_pptx(path):
     """LibreOffice roundtrip to normalize OOXML so PowerPoint stops asking for repair.
@@ -115,6 +119,11 @@ FONT_SIZE_LABEL = Pt(14)
 FONT_SIZE_VALUE = Pt(14)
 FONT_SIZE_SECTION = Pt(14)
 FONT_SIZE_CHART_TITLE = Pt(11)
+FONT_SIZE_SOURCE = Pt(10)
+
+# Phase 4 (ISSUE-011): module-level theme reference so helpers (e.g. _style_cell)
+# can read line_height_pt without an extra parameter. Set in _apply_theme().
+_THEME = None
 
 
 def _apply_theme(theme):
@@ -129,6 +138,9 @@ def _apply_theme(theme):
     global COLOR_TEXT, COLOR_HEADER_BG, COLOR_BAR, COLOR_LINE, COLOR_CAGR_ARROW, COLOR_SOURCE
     global TEXT_HEX, ACCENT_REVENUE_BAR_HEX, ACCENT_OP_MARGIN_LINE_HEX
     global FONT_NAME_JP, FONT_SIZE_LABEL, FONT_SIZE_VALUE, FONT_SIZE_SECTION, FONT_SIZE_CHART_TITLE
+    global FONT_SIZE_SOURCE
+    global _THEME
+    _THEME = theme
 
     SLIDE_W = theme.slide_w
     SLIDE_H = theme.slide_h
@@ -159,6 +171,7 @@ def _apply_theme(theme):
     FONT_SIZE_VALUE = theme.pt("font_size_value_pt")
     FONT_SIZE_SECTION = theme.pt("font_size_section_pt")
     FONT_SIZE_CHART_TITLE = theme.pt("font_size_chart_title_pt")
+    FONT_SIZE_SOURCE = theme.pt("font_size_source_pt")
 
 
 def find_shape(slide, name):
@@ -226,9 +239,14 @@ def build_overview_table(slide, items, left, top, width):
     col0_w = Inches(1.30)  # "• ラベル" column
     col1_w = width - col0_w
 
-    # 行の最小高さを設定 — PPTがテキスト折り返しに応じて自動拡張する
-    # 14pt行 + 適度な余白 ≈ 0.35in
-    min_row_h = Inches(0.35)
+    # 行の最小高さ — PPTがテキスト折り返しに応じて自動拡張する。
+    # brand に line_height_pt があれば余白込みで動的計算 (rollup 12pt → 0.20in 程度)、
+    # なければ stella の既存値 0.35in (14pt 行) を維持。
+    if _THEME is not None and _THEME.line_height_pt() is not None:
+        # 12pt 行 + 4pt 余白 = 16pt = 0.222in
+        min_row_h = Inches((_THEME.line_height_pt() + 4) / 72.0)
+    else:
+        min_row_h = Inches(0.35)
     table_h = min_row_h * n_rows
 
     shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, table_h)
@@ -299,9 +317,13 @@ def _style_cell(cell, text, bold, font_size, row_idx):
     pPr = etree.SubElement(p_elem, qn("a:pPr"))
     pPr.set("algn", "l")
 
-    # 行間を100%（シングル）に固定、前後スペースをゼロに
-    lnSpc = etree.SubElement(pPr, qn("a:lnSpc"))
-    spcPct = etree.SubElement(lnSpc, qn("a:spcPct"), attrib={"val": "100000"})
+    # 行間: brand に line_height_pt があれば spcPts (rollup=12pt) で固定、
+    # なければ既存挙動の spcPct 100% (stella 既定)。
+    if _THEME is not None and _THEME.line_height_pt() is not None:
+        apply_line_spacing(pPr, _THEME)
+    else:
+        lnSpc = etree.SubElement(pPr, qn("a:lnSpc"))
+        etree.SubElement(lnSpc, qn("a:spcPct"), attrib={"val": "100000"})
     spcBef = etree.SubElement(pPr, qn("a:spcBef"))
     etree.SubElement(spcBef, qn("a:spcPts"), attrib={"val": "0"})
     spcAft = etree.SubElement(pPr, qn("a:spcAft"))
@@ -784,7 +806,35 @@ def add_custom_legend(slide, perf_data, left, top, width):
 
 
 def add_source_label(slide, text):
-    """スライド左下に出典テキストを追加"""
+    """スライド左下に出典テキストを追加。
+
+    rollup テンプレに 'Source 3' placeholder があればそこへ書き込み、
+    無ければ動的に textbox を生成 (stella の既存挙動)。
+    """
+    src_shape = None
+    for shape in slide.shapes:
+        if shape.name == SHAPE_SOURCE:
+            src_shape = shape
+            break
+
+    if src_shape is not None:
+        tf = src_shape.text_frame
+        tf.word_wrap = True
+        # 既存サンプルテキスト/段落を1段落だけ残してクリア
+        for p in list(tf.paragraphs[1:]):
+            p._p.getparent().remove(p._p)
+        p = tf.paragraphs[0]
+        for r in list(p.runs):
+            r._r.getparent().remove(r._r)
+        p.alignment = PP_ALIGN.LEFT
+        run = p.add_run()
+        run.text = text
+        run.font.size = FONT_SIZE_SOURCE
+        run.font.color.rgb = COLOR_SOURCE
+        run.font.name = FONT_NAME_JP
+        print(f"  ✓ 出典 (Source 3 placeholder): {text}")
+        return
+
     txBox = slide.shapes.add_textbox(SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H)
     tf = txBox.text_frame
     tf.word_wrap = True
@@ -792,10 +842,10 @@ def add_source_label(slide, text):
     p.alignment = PP_ALIGN.LEFT
     run = p.add_run()
     run.text = text
-    run.font.size = Pt(10)
+    run.font.size = FONT_SIZE_SOURCE
     run.font.color.rgb = COLOR_SOURCE
     run.font.name = FONT_NAME_JP
-    print(f"  ✓ 出典: {text}")
+    print(f"  ✓ 出典 (textbox): {text}")
 
 
 def main():
@@ -818,6 +868,9 @@ def main():
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # Phase 4 (ISSUE-011): rollup は出所必須。stella は no-op (既存 warning 維持)。
+    require_source(data, theme, skill_id=SKILL_ID)
 
     prs = Presentation(template_path)
     slide = prs.slides[0]
