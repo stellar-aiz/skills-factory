@@ -1,7 +1,8 @@
 {
-  "$schema_version": "1.0",
+  "$schema_version": "2.0",
   "id": "rollup",
   "label": "Rollup Standard Format (vF 20250928)",
+  "spec_doc": "skills/_common/brands/rollup/format_spec.md",
   "slide_size": {
     "width_in": 11.69,
     "height_in": 8.27,
@@ -43,6 +44,24 @@
     "font_size_legend_pt": 12,
     "font_size_source_pt": 10,
     "font_size_axis_pt": 11,
-    "font_size_cagr_pt": 16
-  }
+    "font_size_cagr_pt": 16,
+
+    "font_size_title_pt": 22,
+    "font_size_subtitle_pt": 12,
+    "font_size_key_message_pt": 14,
+    "font_size_body_pt": 10,
+    "font_size_executive_summary_body_pt": 12,
+
+    "line_height_pt": 12,
+    "number_format_excel": "_ * #,##0_ ;_ * (#,##0)_ ;_ \"-\"_ ;_ @_ ",
+    "negative_format": "paren",
+    "zero_text": "-",
+    "fiscal_period_format": "YY/MM期"
+  },
+  "layout_rules": {
+    "left_align_guide_x_in": 0.41,
+    "uniform_table_width": true,
+    "source_required": true
+  },
+  "executive_summary_skill_ids": ["executive-summary-pptx"]
 }

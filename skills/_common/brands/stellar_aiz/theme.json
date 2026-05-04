@@ -1,5 +1,5 @@
 {
-  "$schema_version": "1.0",
+  "$schema_version": "2.0",
   "id": "stellar_aiz",
   "label": "Stellar AIZ Default",
   "slide_size": {
@@ -43,6 +43,20 @@
     "font_size_legend_pt": 12,
     "font_size_source_pt": 10,
     "font_size_axis_pt": 11,
-    "font_size_cagr_pt": 16
-  }
+    "font_size_cagr_pt": 16,
+
+    "font_size_title_pt": 28,
+    "font_size_subtitle_pt": 14,
+    "font_size_key_message_pt": 14,
+    "font_size_body_pt": 14,
+    "font_size_executive_summary_body_pt": 14,
+
+    "negative_format": "minus",
+    "zero_text": "0"
+  },
+  "layout_rules": {
+    "uniform_table_width": false,
+    "source_required": false
+  },
+  "executive_summary_skill_ids": []
 }

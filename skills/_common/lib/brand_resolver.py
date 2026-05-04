@@ -21,6 +21,18 @@ Usage in fill_*.py:
     pt    = theme.pt("font_size_label_pt") # Pt
     panel = theme.layout("panel_y_in")     # EMU (Inches converted)
     tpl   = theme.template_path(SKILL_DIR, "customer-profile")
+
+Schema 2.0 accessors (Phase 1, ISSUE-011):
+
+    body_sz = theme.font_size_body_pt(skill_id="executive-summary-pptx")
+    nf      = theme.number_format_excel()    # "_ * #,##0_ ;_ * (#,##0)_ ;_ \"-\"_ ;_ @_ "
+    lh      = theme.line_height_pt()         # 12 for rollup, None for stella
+    neg     = theme.negative_format()        # "paren" / "triangle" / "minus"
+    z       = theme.zero_text()              # "-" for rollup, "0" for stella
+    fp      = theme.fiscal_period_format()   # "YY/MM期" for rollup, None for stella
+    guide_x = theme.layout_rule("left_align_guide_x_in")  # 0.41 for rollup, None for stella
+    if theme.is_source_required() and not data.get("source"):
+        raise ValueError("source required")
 """
 from __future__ import annotations
 
@@ -57,9 +69,12 @@ class BrandTheme:
     font_ea: str
     fallback_ea: tuple
     chart_palette: tuple
+    schema_version: str = "1.0"
     _colors: dict = field(default_factory=dict)
     _defaults: dict = field(default_factory=dict)
     _layout: dict = field(default_factory=dict)
+    _layout_rules: dict = field(default_factory=dict)
+    _executive_summary_skill_ids: tuple = field(default_factory=tuple)
     _skill_dir: Optional[str] = None
 
     def color(self, key: str) -> RGBColor:
@@ -108,6 +123,80 @@ class BrandTheme:
         if key not in self._layout:
             raise KeyError(f"theme layout key not found: {key!r} (brand={self.id})")
         return float(self._layout[key])
+
+    # ---- schema 2.0 accessors (Phase 1, ISSUE-011) ------------------------
+    # All accessors below are safe for schema 1.0 themes: missing keys return
+    # the documented fallback so V1 (schema 1.0) brands continue to work even
+    # when fill scripts are migrated to call these new accessors.
+
+    def line_height_pt(self) -> Optional[int]:
+        """Paragraph line spacing in pt for body/table cells.
+
+        Used for OOXML `<a:lnSpc><a:spcPts val=...>`. Returns None when the
+        brand does not specify a line height (caller should leave the existing
+        OOXML untouched, preserving template default behaviour).
+        """
+        v = self._defaults.get("line_height_pt")
+        return int(v) if v is not None else None
+
+    def number_format_excel(self) -> Optional[str]:
+        """Excel number format string for spreadsheet cells (e.g. '#,##0').
+
+        Returns None when the brand does not pin a format (caller should fall
+        back to the existing per-skill behaviour).
+        """
+        return self._defaults.get("number_format_excel")
+
+    def zero_text(self) -> str:
+        """Display text for cells whose value is exactly zero. Default '0'."""
+        return self._defaults.get("zero_text", "0")
+
+    def negative_format(self) -> str:
+        """How to render negative numbers: 'paren' / 'triangle' / 'minus'."""
+        return self._defaults.get("negative_format", "minus")
+
+    def fiscal_period_format(self) -> Optional[str]:
+        """Fiscal period label format (e.g. 'YY/MM期'). None if unspecified."""
+        return self._defaults.get("fiscal_period_format")
+
+    def font_size_body_pt(self, skill_id: Optional[str] = None) -> "Pt":
+        """Body / table-cell font size as pptx Pt, with executive-summary auto-switch.
+
+        When `skill_id` is in `executive_summary_skill_ids`, returns
+        `font_size_executive_summary_body_pt`; otherwise `font_size_body_pt`.
+        Falls back to legacy `font_size_label_pt` for schema 1.0 themes.
+        """
+        return Pt(self.font_size_body_pt_value(skill_id))
+
+    def font_size_body_pt_value(self, skill_id: Optional[str] = None) -> int:
+        """Same as font_size_body_pt() but returns raw int."""
+        if skill_id and skill_id in self._executive_summary_skill_ids:
+            v = self._defaults.get("font_size_executive_summary_body_pt")
+            if v is not None:
+                return int(v)
+        v = self._defaults.get("font_size_body_pt")
+        if v is not None:
+            return int(v)
+        # Schema 1.0 fallback: legacy label/value sizes (stella V1 = 14pt).
+        return int(self._defaults.get("font_size_label_pt", 14))
+
+    def layout_rule(self, key: str, default=None):
+        """Read a value from theme.json `layout_rules` block.
+
+        Common keys: 'left_align_guide_x_in' (float), 'uniform_table_width' (bool),
+        'source_required' (bool).
+        """
+        return self._layout_rules.get(key, default)
+
+    def is_source_required(self) -> bool:
+        """True when 'source' field must be present (else fill_*.py raises)."""
+        return bool(self._layout_rules.get("source_required", False))
+
+    def is_executive_summary_skill(self, skill_id: str) -> bool:
+        """True when the given skill_id should use executive-summary body size."""
+        return skill_id in self._executive_summary_skill_ids
+
+    # -----------------------------------------------------------------------
 
     def template_path(self, skill_dir: str, skill_name: str) -> str:
         """Resolve path to the brand-specific template pptx for this skill.
@@ -190,6 +279,7 @@ def resolve_brand(brand: str, skill_dir: Optional[str] = None) -> BrandTheme:
     return BrandTheme(
         id=theme_data["id"],
         label=theme_data.get("label", theme_data["id"]),
+        schema_version=str(theme_data.get("$schema_version", "1.0")),
         slide_w=Inches(slide_size["width_in"]),
         slide_h=Inches(slide_size["height_in"]),
         font_latin=fonts["latin"],
@@ -199,6 +289,8 @@ def resolve_brand(brand: str, skill_dir: Optional[str] = None) -> BrandTheme:
         _colors=dict(theme_data["colors"]),
         _defaults=dict(theme_data["defaults"]),
         _layout=dict(layout_data),
+        _layout_rules=dict(theme_data.get("layout_rules", {})),
+        _executive_summary_skill_ids=tuple(theme_data.get("executive_summary_skill_ids", [])),
         _skill_dir=skill_dir,
     )
 
