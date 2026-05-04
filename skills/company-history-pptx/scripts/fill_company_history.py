@@ -35,6 +35,9 @@ from lxml import etree
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text  # noqa: E402
+
+SKILL_ID = "company-history-pptx"
 
 def _finalize_pptx(path):
     """LibreOffice roundtrip to normalize OOXML so PowerPoint stops asking for repair.
@@ -316,14 +319,16 @@ def main():
     slide = prs.slides[0]
 
     # 1. メインメッセージ設定
-    main_message = data.get("main_message", "")
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), main_message)
-    print(f"  ✓ メインメッセージ: {main_message}")
+    # Top placeholder (stella: main_message / roleup: chart_title)
+    top_text = resolve_top_text(data, theme)
+    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+    print(f"  ✓ Top placeholder ({theme.top_placeholder_field()}): {top_text}")
 
     # 2. チャートタイトル設定
-    chart_title = data.get("chart_title", "会社沿革")
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), chart_title)
-    print(f"  ✓ チャートタイトル: {chart_title}")
+    # Subtitle placeholder (stella: chart_title / roleup: main_message)
+    sub_text = resolve_subtitle_text(data, theme) or "会社沿革"
+    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
+    print(f"  ✓ Subtitle placeholder ({theme.subtitle_placeholder_field()}): {sub_text}")
 
     # 3. テーブル再構築（slide_height はテンプレートから取得 = brand 固有のスライドサイズに対応）
     history = data.get("history", [])

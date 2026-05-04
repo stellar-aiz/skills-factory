@@ -30,19 +30,44 @@
 | 売上棒 (accent_revenue_bar) | `#7C4C2C` | チャート売上系列 |
 | 利益率折れ線 (accent_op_margin_line) | `#604C3F` | チャート利益率系列 |
 | CAGR 矢印 | `#241A17` | 注記矢印 |
+| **サブタイトル (subtitle)** | `#897141`(accent2 薄茶色) | セクションタイトル「企業の概要」「業績」等の 12pt サブタイトル文字色 |
 
 **chart_palette** (連続使用時の系列色順):
 1. `#7C4C2C`(accent1) / 2. `#897141`(accent2) / 3. `#604C3F`(accent3) / 4. `#C78624`(dk2) / 5. `#AF7026`(lt2) / 6. `#3E3A39`(accent5) / 7. `#9C755F` / 8. `#CDCECE`(accent4)
 
 ## 3. フォントサイズ (slide_type 別)
 
+### skills_factory 共通理解 (2026-05-04 ユーザー指示)
+
+| 用語 | 定義 | 例 |
+|---|---|---|
+| **スライドタイトル** | 短い見出し | 「○○市場の動向」「主要顧客プロファイル：株式会社ジップ」 |
+| **メインメッセージ** | 結論文 | 「○○市場は、xxxが要因で CAGRx.x% で成長している」 |
+| **サブタイトル** | 各セクションの小見出し | 「企業の概要」「業績」 |
+
+### roleup の placeholder 意味と入力データフィールド
+
+| 公式テンプレ位置 | shape 名 | フォントサイズ | 入力データフィールド |
+|---|---|---|---|
+| p.3 「タイトル」位置 | Title 1 (旧「タイトル 3」) | **22pt** | **`chart_title`**(スライドタイトル) |
+| p.3 「キーメッセージ」位置 | Text Placeholder 2 (旧「テキスト プレースホルダー 4」) | **14pt** | **`main_message`**(メインメッセージ) |
+| p.4 「Subtitle」位置 | (動的 textbox at panel_y_in=1.51) | **12pt 左寄せ #897141** | `section_title`(サブタイトル) |
+| 下部「出所」位置 | Source 3 (旧「テキスト プレースホルダー 3」) | **6pt** | `source` |
+
+**重要**: stella では `top_placeholder_field` / `subtitle_placeholder_field` を逆順で定義することで
+「最上部 = main_message(結論文)、副題 = chart_title(見出し)」という stella 既存運用を維持する。
+brand 別の placeholder 意味は `theme.json/placeholder_role_mapping` で宣言、
+`format_helpers.resolve_top_text(data, theme)` / `resolve_subtitle_text(data, theme)` で吸収する。
+
+### 全フォントサイズ表
+
 | Shape 種別 | サイズ | 用途 |
 |---|---|---|
-| Title (タイトル 3) | **22pt** | スライドタイトル |
-| Subtitle (テキスト プレースホルダー 5) | **12pt** | サブタイトル / 各パネルラベル |
-| Key Message (テキスト プレースホルダー 4) | **14pt** | スライド最上部のメインメッセージ |
-| **本文・テーブル (通常)** | **10pt** | 全 skill デフォルト |
-| **本文・テーブル (executive-summary-pptx のみ)** | **12pt** | F-3 判定: skill 名で自動切替 |
+| Title (Title 1) | **22pt** | スライドタイトル(短い見出し) |
+| Key Message (Text Placeholder 2) | **14pt** | メインメッセージ(結論文) |
+| Subtitle (動的) | **12pt** | サブタイトル(セクション見出し) |
+| 本文・テーブル (通常) | **10pt** | 全 skill デフォルト |
+| 本文・テーブル (executive-summary-pptx のみ) | **12pt** | F-3 判定: skill 名で自動切替 |
 | 出所 / 注記 (テキスト プレースホルダー 3) | **6pt** | 下端の出所ライン |
 | CAGR ラベル | **16pt** | チャート上の CAGR 注記 |
 | チャートタイトル | **11pt** | (用途限定) |

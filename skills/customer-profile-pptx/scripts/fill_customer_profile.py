@@ -41,7 +41,12 @@ from lxml import etree
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
-from format_helpers import apply_line_spacing, require_source  # noqa: E402
+from format_helpers import (  # noqa: E402
+    apply_line_spacing,
+    require_source,
+    resolve_top_text,
+    resolve_subtitle_text,
+)
 
 SKILL_ID = "customer-profile-pptx"
 SHAPE_SOURCE = "Source 3"   # roleup template only; stella falls back to add_textbox
@@ -108,6 +113,7 @@ COLOR_BAR = RGBColor(0x4E, 0x79, 0xA7)       # Revenue bars
 COLOR_LINE = RGBColor(0x00, 0x33, 0x66)      # Op margin line / legend connector
 COLOR_CAGR_ARROW = RGBColor(0x33, 0x33, 0x33)
 COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
+COLOR_SUBTITLE = RGBColor(0x33, 0x33, 0x33)  # default = text; reassigned in _apply_theme
 
 # Hex strings (no leading '#') for inline OOXML attribute values
 TEXT_HEX = "333333"
@@ -135,7 +141,7 @@ def _apply_theme(theme):
     """
     global SLIDE_W, SLIDE_H, PANEL_Y, LEFT_X, LEFT_W, RIGHT_X, RIGHT_W, CHART_H
     global SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H
-    global COLOR_TEXT, COLOR_HEADER_BG, COLOR_BAR, COLOR_LINE, COLOR_CAGR_ARROW, COLOR_SOURCE
+    global COLOR_TEXT, COLOR_HEADER_BG, COLOR_BAR, COLOR_LINE, COLOR_CAGR_ARROW, COLOR_SOURCE, COLOR_SUBTITLE
     global TEXT_HEX, ACCENT_REVENUE_BAR_HEX, ACCENT_OP_MARGIN_LINE_HEX
     global FONT_NAME_JP, FONT_SIZE_LABEL, FONT_SIZE_VALUE, FONT_SIZE_SECTION, FONT_SIZE_CHART_TITLE
     global FONT_SIZE_SOURCE
@@ -161,6 +167,7 @@ def _apply_theme(theme):
     COLOR_LINE = theme.color("accent_op_margin_line")
     COLOR_CAGR_ARROW = theme.color("cagr_arrow")
     COLOR_SOURCE = theme.color("source")
+    COLOR_SUBTITLE = theme.color("subtitle")  # roleup #897141 / stella #333333 (= text)
 
     TEXT_HEX = theme.hex_no_hash("text")
     ACCENT_REVENUE_BAR_HEX = theme.hex_no_hash("accent_revenue_bar")
@@ -214,12 +221,14 @@ def add_section_title(slide, text, left, top, width):
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.CENTER
+    # alignment: stella=CENTER (既存), roleup=LEFT (公式 vF p.4 Subtitle 準拠)
+    align_str = _THEME.layout_rule("subtitle_align", "center") if _THEME is not None else "center"
+    p.alignment = PP_ALIGN.LEFT if align_str == "left" else PP_ALIGN.CENTER
     run = p.add_run()
     run.text = text
     run.font.size = FONT_SIZE_SECTION
     run.font.bold = True
-    run.font.color.rgb = COLOR_TEXT
+    run.font.color.rgb = COLOR_SUBTITLE
     run.font.name = FONT_NAME_JP
 
     # 下線を追加
@@ -875,15 +884,17 @@ def main():
     prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    # 1. Main Message
-    main_message = data.get("main_message", "")
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), main_message)
-    print(f"  ✓ Main Message: {main_message}")
+    # 1. Top placeholder (最上部の最大フォント位置)
+    #    stella: main_message (結論文) / roleup: chart_title (スライドタイトル見出し)
+    top_text = resolve_top_text(data, theme)
+    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+    print(f"  ✓ Top placeholder ({theme.top_placeholder_field()}): {top_text}")
 
-    # 2. Chart Title
-    chart_title = data.get("chart_title", "主要顧客プロファイル")
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), chart_title)
-    print(f"  ✓ Chart Title: {chart_title}")
+    # 2. Subtitle placeholder (副題位置)
+    #    stella: chart_title (見出し) / roleup: main_message (結論文)
+    sub_text = resolve_subtitle_text(data, theme)
+    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
+    print(f"  ✓ Subtitle placeholder ({theme.subtitle_placeholder_field()}): {sub_text}")
 
     # 3. 既存テーブルを削除
     remove_shape(slide, "Table 1")

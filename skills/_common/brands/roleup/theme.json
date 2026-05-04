@@ -23,7 +23,8 @@
     "label_bg": "#F2E8DD",
     "accent_revenue_bar": "#7C4C2C",
     "accent_op_margin_line": "#604C3F",
-    "cagr_arrow": "#241A17"
+    "cagr_arrow": "#241A17",
+    "subtitle": "#897141"
   },
   "chart_palette": [
     "#7C4C2C",
@@ -61,7 +62,12 @@
   "layout_rules": {
     "left_align_guide_x_in": 0.41,
     "uniform_table_width": true,
-    "source_required": true
+    "source_required": true,
+    "subtitle_align": "left"
   },
-  "executive_summary_skill_ids": ["executive-summary-pptx"]
+  "executive_summary_skill_ids": ["executive-summary-pptx"],
+  "placeholder_role_mapping": {
+    "top_placeholder_field": "chart_title",
+    "subtitle_placeholder_field": "main_message"
+  }
 }

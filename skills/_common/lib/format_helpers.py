@@ -113,6 +113,29 @@ def apply_line_spacing(pPr_or_p, theme) -> None:
     pPr.insert(0, lnSpc)
 
 
+def resolve_top_text(data: dict, theme) -> str:
+    """Return the text written to the top (largest font) placeholder.
+
+    Reads theme.top_placeholder_field() to decide which data field to use.
+    Per skills_factory convention (2026-05-04):
+      - stella: 'main_message' (結論文を最上部に)
+      - roleup: 'chart_title'  (スライドタイトルを最上部に)
+
+    Falls back to 'main_message' for schema 1.0 themes (= stella既存挙動).
+    """
+    field = theme.top_placeholder_field() if hasattr(theme, "top_placeholder_field") else "main_message"
+    return data.get(field, "")
+
+
+def resolve_subtitle_text(data: dict, theme) -> str:
+    """Return the text written to the subtitle placeholder.
+
+    Inverse of resolve_top_text. Falls back to 'chart_title' for schema 1.0.
+    """
+    field = theme.subtitle_placeholder_field() if hasattr(theme, "subtitle_placeholder_field") else "chart_title"
+    return data.get(field, "")
+
+
 def require_source(data: dict, theme, skill_id: Optional[str] = None) -> None:
     """Raise ValueError if theme requires a source field but data lacks one.
 

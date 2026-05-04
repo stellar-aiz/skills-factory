@@ -21,6 +21,9 @@ import argparse, copy, json, math, os, sys
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text  # noqa: E402
+
+SKILL_ID = "market-environment-pptx"
 
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -633,8 +636,12 @@ def main():
     print("=== 市場環境分析スライド生成（ネイティブPPTX）===")
     prs = Presentation(template_path); slide = prs.slides[0]
 
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), data.get("main_message",""))
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), data.get("chart_title","市場環境分析"))
+    # Top placeholder (stella: main_message / roleup: chart_title)
+    top_text = resolve_top_text(data, theme)
+    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+    # Subtitle placeholder (stella: chart_title / roleup: main_message)
+    sub_text = resolve_subtitle_text(data, theme) or "市場環境分析"
+    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
     src = data.get("source","")
     if src: set_textbox_text(find_shape(slide, SHAPE_SOURCE), f"出典：{src}")
     remove_shape(slide, SHAPE_CONTENT_AREA)

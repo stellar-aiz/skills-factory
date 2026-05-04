@@ -75,6 +75,7 @@ class BrandTheme:
     _layout: dict = field(default_factory=dict)
     _layout_rules: dict = field(default_factory=dict)
     _executive_summary_skill_ids: tuple = field(default_factory=tuple)
+    _placeholder_role_mapping: dict = field(default_factory=dict)
     _skill_dir: Optional[str] = None
 
     def color(self, key: str) -> RGBColor:
@@ -196,6 +197,20 @@ class BrandTheme:
         """True when the given skill_id should use executive-summary body size."""
         return skill_id in self._executive_summary_skill_ids
 
+    def top_placeholder_field(self) -> str:
+        """Data field name written to the top (largest font) placeholder.
+
+        Per skills_factory convention (2026-05-04):
+          - stella: 'main_message' (結論文を最上部に大きく)
+          - roleup: 'chart_title'  (スライドタイトルを最上部に大きく)
+        Falls back to 'main_message' (stella既存挙動) when not specified.
+        """
+        return self._placeholder_role_mapping.get("top_placeholder_field", "main_message")
+
+    def subtitle_placeholder_field(self) -> str:
+        """Data field name written to the subtitle placeholder."""
+        return self._placeholder_role_mapping.get("subtitle_placeholder_field", "chart_title")
+
     # -----------------------------------------------------------------------
 
     def template_path(self, skill_dir: str, skill_name: str) -> str:
@@ -291,6 +306,7 @@ def resolve_brand(brand: str, skill_dir: Optional[str] = None) -> BrandTheme:
         _layout=dict(layout_data),
         _layout_rules=dict(theme_data.get("layout_rules", {})),
         _executive_summary_skill_ids=tuple(theme_data.get("executive_summary_skill_ids", [])),
+        _placeholder_role_mapping=dict(theme_data.get("placeholder_role_mapping", {})),
         _skill_dir=skill_dir,
     )
 
