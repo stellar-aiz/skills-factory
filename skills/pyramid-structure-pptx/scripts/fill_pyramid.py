@@ -22,6 +22,11 @@ import argparse
 import json
 import sys
 
+# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
+from brand_resolver import add_brand_arg  # noqa: E402
+
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
@@ -339,6 +344,7 @@ def main():
     parser.add_argument("--data",     required=True, help="pyramid_data.json のパス")
     parser.add_argument("--template", required=True, help="pyramid-template-universal.pptx のパス")
     parser.add_argument("--output",   required=True, help="出力PPTXのパス")
+    add_brand_arg(parser)  # passive: accepted but ignored until brand migration
     args = parser.parse_args()
 
     with open(args.data, "r", encoding="utf-8") as f:

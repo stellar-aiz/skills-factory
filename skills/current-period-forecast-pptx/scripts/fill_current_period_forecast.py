@@ -18,6 +18,11 @@ BDD（Business Due Diligence）向け。
 """
 
 import argparse
+
+# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
+from brand_resolver import add_brand_arg  # noqa: E402
 import asyncio
 import json
 import os
@@ -367,6 +372,7 @@ def main():
     parser.add_argument("--data", required=True, help="JSONデータファイルパス")
     parser.add_argument("--template", required=True, help="PPTXテンプレートパス")
     parser.add_argument("--output", required=True, help="出力PPTXファイルパス")
+    add_brand_arg(parser)  # passive: accepted but ignored until brand migration
     args = parser.parse_args()
 
     with open(args.data, "r", encoding="utf-8") as f:
