@@ -35,7 +35,7 @@ from lxml import etree
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
-from format_helpers import resolve_top_text, resolve_subtitle_text  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
 
 SKILL_ID = "company-history-pptx"
 
@@ -78,6 +78,9 @@ def _finalize_pptx(path):
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE  = "Text Placeholder 2"
 SHAPE_TABLE        = "Table 1"
+SHAPE_SOURCE       = "Source 3"  # roleup template placeholder; stella では存在しない可能性あり
+
+SKILL_ID = "company-history-pptx"
 
 # ── Brand-aware module global (slide height) ──
 # Default = stella's 7.5in for backward compat; reassigned in main() from
@@ -93,6 +96,15 @@ def find_shape(slide, name):
             return shape
     print(f"  ⚠ WARNING: Shape '{name}' not found", file=sys.stderr)
     return None
+
+
+def _silent_remove_shape(slide, name):
+    """find_shape の warning を出さずに削除を試みる(brand 別 shape 名フォールバック用)"""
+    for shape in slide.shapes:
+        if shape.name == name:
+            slide.shapes._spTree.remove(shape._element)
+            return True
+    return False
 
 
 def set_textbox_text(shape, text):
@@ -314,9 +326,19 @@ def main():
 
     print(f"  データ読み込み完了: {len(data.get('history', []))}件の沿革")
 
+    # roleup は出所必須 (theme.layout_rules.source_required = true)。
+    # stella は no-op で従来挙動維持。
+    require_source(data, theme, skill_id=SKILL_ID)
+
     # テンプレート読み込み
     prs = Presentation(template_path)
     slide = prs.slides[0]
+
+    # 0. roleup 公式テンプレ由来のチャート位置ガイド矩形(茶色 accent2)を出力から除去。
+    #    ガイドはチャート寸法の参考にすぎず、出力ではマスター背景(白)が見えるべき。
+    #    stella テンプレにはこれらの shape 名が存在しないため silent no-op で安全。
+    _silent_remove_shape(slide, "正方形/長方形 1")
+    _silent_remove_shape(slide, "正方形/長方形 8")
 
     # 1. メインメッセージ設定
     # Top placeholder (stella: main_message / roleup: chart_title)
@@ -334,7 +356,23 @@ def main():
     history = data.get("history", [])
     rebuild_history_table(slide, history, slide_height=prs.slide_height)
 
-    # 3. 出力
+    # 4. 出典書き込み (Source 3 placeholder があればそこへ)。stella では shape 不在なら skip。
+    src_text = data.get("source", "")
+    if src_text:
+        src_shape = None
+        for nm in (SHAPE_SOURCE, "Source"):
+            for shape in slide.shapes:
+                if shape.name == nm:
+                    src_shape = shape
+                    break
+            if src_shape is not None:
+                break
+        if src_shape is not None:
+            display = src_text if src_text.startswith("出典") else f"出典：{src_text}"
+            set_textbox_text(src_shape, display)
+            print(f"  ✓ 出典 ({src_shape.name}): {display}")
+
+    # 5. 出力
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     prs.save(args.output)
     _finalize_pptx(args.output)
