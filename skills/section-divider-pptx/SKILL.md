@@ -102,7 +102,7 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_section_divider.py \
   --data {{WORK_DIR}}/section_divider_data.json \
-  --template <SKILL_DIR>/assets/section-divider-pptx-template.pptx \
+  --template <SKILL_DIR>/assets/section-divider-template.pptx \
   --output {{OUTPUT_DIR}}/SectionDivider_output.pptx
 ```
 
@@ -122,7 +122,7 @@ python <SKILL_DIR>/scripts/fill_section_divider.py \
 
 | ファイル | 用途 |
 |---|---|
-| `assets/section-divider-pptx-template.pptx` | スライドテンプレート |
+| `assets/section-divider-template.pptx` | スライドテンプレート |
 | `scripts/fill_section_divider.py` | 生成スクリプト |
 | `references/sample_data.json` | サンプル（Section 03 マクロ・市場環境分析） |
 

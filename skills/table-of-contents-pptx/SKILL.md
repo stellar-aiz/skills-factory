@@ -109,7 +109,7 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_table_of_contents.py \
   --data {{WORK_DIR}}/toc_data.json \
-  --template <SKILL_DIR>/assets/table-of-contents-pptx-template.pptx \
+  --template <SKILL_DIR>/assets/table-of-contents-template.pptx \
   --output {{OUTPUT_DIR}}/TableOfContents_output.pptx
 ```
 
@@ -128,7 +128,7 @@ python <SKILL_DIR>/scripts/fill_table_of_contents.py \
 
 | ファイル | 用途 |
 |---|---|
-| `assets/table-of-contents-pptx-template.pptx` | スライドテンプレート |
+| `assets/table-of-contents-template.pptx` | スライドテンプレート |
 | `scripts/fill_table_of_contents.py` | 生成スクリプト |
 | `references/sample_data.json` | サンプル（6セクション構成） |
 

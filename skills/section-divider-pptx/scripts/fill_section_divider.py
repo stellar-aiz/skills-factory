@@ -12,7 +12,7 @@ fill_section_divider.py — 中扉（Section Divider）スライドを生成
 Usage:
   python fill_section_divider.py \
     --data /home/claude/section_divider_data.json \
-    --template <path>/section-divider-pptx-template.pptx \
+    --template <path>/section-divider-template.pptx \
     --output /mnt/user-data/outputs/SectionDivider_output.pptx
 """
 

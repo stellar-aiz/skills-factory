@@ -15,7 +15,7 @@ Usage:
     --output /mnt/user-data/outputs/MarketEnvironment_output.pptx
 """
 
-import argparse, copy, json, math, os, sys
+import argparse, copy, json, math, os, re, sys
 
 # ── brand_resolver bootstrap (skills/_common/lib/brand_resolver.py) ──
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -303,6 +303,13 @@ def _reorder_plot_area(pa):
     for c in axes:    pa.append(c)
     for c in others:  pa.append(c)
 
+def _year_to_int(year) -> int:
+    s = str(year)
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        raise ValueError(f"year value contains no digits: {year!r}")
+    return int(digits)
+
 # ── チャート生成 ──
 def build_stacked_combo_chart(slide, cfg, left, top, w, h):
     from pptx.chart.data import CategoryChartData
@@ -316,7 +323,7 @@ def build_stacked_combo_chart(slide, cfg, left, top, w, h):
     # categories: roleup なら "YY/MM期" (公式 vF 例)、stella は西暦 4 桁を維持
     if _THEME is not None and _THEME.fiscal_period_format():
         fy_month = cfg.get("fiscal_year_end_month", 12)
-        cd.categories = [format_fiscal_period(int(d["year"]), fy_month, _THEME) for d in data]
+        cd.categories = [format_fiscal_period(_year_to_int(d["year"]), fy_month, _THEME) for d in data]
     else:
         cd.categories = [d["year"] for d in data]
     for si, sb in enumerate(bars_cfg):

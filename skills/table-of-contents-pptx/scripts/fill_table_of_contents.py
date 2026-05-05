@@ -9,7 +9,7 @@ fill_table_of_contents.py — 目次（Table of Contents）スライドを生成
 Usage:
   python fill_table_of_contents.py \
     --data /home/claude/toc_data.json \
-    --template <path>/table-of-contents-pptx-template.pptx \
+    --template <path>/table-of-contents-template.pptx \
     --output /mnt/user-data/outputs/TableOfContents_output.pptx
 """
 

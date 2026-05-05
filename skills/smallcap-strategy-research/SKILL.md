@@ -443,7 +443,7 @@ python3 ~/.claude/skills/executive-summary-pptx/scripts/fill_executive_summary.p
 # スライド2: Table of Contents
 python3 ~/.claude/skills/table-of-contents-pptx/scripts/fill_table_of_contents.py \
   --data {{WORK_DIR}}/pptx_table_of_contents.json \
-  --template ~/.claude/skills/table-of-contents-pptx/assets/table-of-contents-pptx-template.pptx \
+  --template ~/.claude/skills/table-of-contents-pptx/assets/table-of-contents-template.pptx \
   --output {{WORK_DIR}}/slide_02_toc.pptx
 
 # スライド3: Company Overview

@@ -169,7 +169,7 @@ supported_brands: [stellar_aiz]
 ```bash
 pip install python-pptx lxml -q --break-system-packages
 
-python {{SKILL_DIR}}/scripts/fill_kbf.py \
+python {{SKILL_DIR}}/scripts/fill_market_kbf.py \
   --data {{WORK_DIR}}/market_kbf_data.json \
   --template {{SKILL_DIR}}/assets/market-kbf-template.pptx \
   --output {{OUTPUT_DIR}}/MarketKBF_output.pptx
@@ -270,7 +270,7 @@ python -m markitdown {{OUTPUT_DIR}}/MarketKBF_output.pptx
 
 | ファイル名 | 用途 |
 |---|---|
-| `scripts/fill_kbf.py` | JSONデータからKBFテーブル（3行×3列）をネイティブで生成 |
+| `scripts/fill_market_kbf.py` | JSONデータからKBFテーブル（3行×3列）をネイティブで生成 |
 
 ## 参考
 
