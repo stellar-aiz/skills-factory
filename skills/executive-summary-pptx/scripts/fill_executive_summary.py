@@ -19,10 +19,13 @@ import json
 import os
 import sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+
+SKILL_ID = "executive-summary-pptx"
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
@@ -70,8 +73,10 @@ def _finalize_pptx(path):
 # ── Layout Constants ──
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE = "Text Placeholder 2"
+SHAPE_SOURCE = "Source 3"  # roleup template placeholder; stella adds dynamic textbox
 
-# Findingsグリッド配置
+# Default values (stella) — reassigned in main() via _apply_theme(theme).
+# Findings grid placement.
 GRID_LEFT = Inches(0.41)
 GRID_TOP = Inches(1.55)
 GRID_WIDTH = Inches(12.51)
@@ -80,6 +85,7 @@ GRID_HEIGHT = Inches(5.35)
 SOURCE_X = Inches(0.41)
 SOURCE_Y = Inches(6.93)
 SOURCE_W = Inches(12.50)
+SOURCE_H = Inches(0.25)
 
 # ── Colors ──
 COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
@@ -139,6 +145,64 @@ FONT_SIZE_HEADING = Pt(16)
 FONT_SIZE_DETAIL = Pt(13)
 FONT_SIZE_SOURCE = Pt(11)
 
+# Theme module-global; populated in main() via _apply_theme(theme) so helper
+# functions (require_source / resolve_top_text) can read it without an extra
+# parameter passed through 200+ lines of fill code.
+_THEME = None
+
+
+def _apply_theme(theme):
+    """Reassign module-level brand-aware globals from a resolved BrandTheme.
+
+    Called once from main() after `--brand` is parsed. Only invoked from main(),
+    so other functions see the post-_apply_theme values.
+    """
+    global _THEME
+    global GRID_LEFT, GRID_TOP, GRID_WIDTH, GRID_HEIGHT
+    global SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H
+    global COLOR_TEXT, COLOR_SOURCE, COLOR_SUBTEXT, LABEL_BAR_RGB, LABEL_BAR_COLOR, LABEL_BG_COLOR
+    global FONT_NAME_JP, FONT_SIZE_CATEGORY, FONT_SIZE_HEADING, FONT_SIZE_DETAIL, FONT_SIZE_SOURCE
+
+    _THEME = theme
+
+    GRID_LEFT = theme.layout("grid_left_in")
+    GRID_TOP = theme.layout("grid_top_in")
+    GRID_WIDTH = theme.layout("grid_width_in")
+    GRID_HEIGHT = theme.layout("grid_height_in")
+    SOURCE_X = theme.layout("source_x_in")
+    SOURCE_Y = theme.layout("source_y_in")
+    SOURCE_W = theme.layout("source_w_in")
+    SOURCE_H = theme.layout("source_h_in")
+
+    COLOR_TEXT = theme.color("text")
+    COLOR_SOURCE = theme.color("source")
+    COLOR_SUBTEXT = theme.color("text")  # subtext follows text color in both brands
+    LABEL_BAR_RGB = theme.color("label_bar")
+    LABEL_BAR_COLOR = theme.hex("label_bar")
+    LABEL_BG_COLOR = theme.hex("label_bg")
+
+    FONT_NAME_JP = theme.font_ea
+    # Title / chart_title placeholder font sizes are set by template; here we
+    # only pin the body / category / detail / source sizes that fill controls.
+    # Roleup uses 12pt for executive-summary body (per executive_summary_skill_ids).
+    body_pt = theme.font_size_body_pt(skill_id=SKILL_ID)
+    FONT_SIZE_CATEGORY = body_pt
+    FONT_SIZE_HEADING = body_pt
+    FONT_SIZE_DETAIL = body_pt
+    FONT_SIZE_SOURCE = theme.pt("font_size_source_pt")
+
+
+def _silent_remove_shape(slide, shape_name: str) -> None:
+    """Remove a shape by name without printing a warning. No-op if absent.
+
+    Used for roleup brown rect guides that the template carries for visual
+    consistency but exec-summary's dynamic finding grid does not need.
+    """
+    for s in list(slide.shapes):
+        if s.name == shape_name:
+            sp = s._element
+            sp.getparent().remove(sp)
+
 
 # ──────────────────────────────────────────────
 # Utility
@@ -169,7 +233,14 @@ def set_textbox_text(shape, text):
 
 def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
                  color=None, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
-                 italic=False, font_name=FONT_NAME_JP):
+                 italic=False, font_name=None):
+    # font_name / color default to current module globals (post-_apply_theme).
+    # Using None sentinel + late binding avoids capturing stella's pre-theme
+    # values when the function is defined at module load time.
+    if font_name is None:
+        font_name = FONT_NAME_JP
+    if color is None:
+        color = COLOR_TEXT
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
     tf.word_wrap = True
@@ -184,10 +255,7 @@ def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
     run.font.bold = bold
     run.font.italic = italic
     run.font.name = font_name
-    if color is not None:
-        run.font.color.rgb = color
-    else:
-        run.font.color.rgb = COLOR_TEXT
+    run.font.color.rgb = color
     return tb
 
 
@@ -392,21 +460,45 @@ def _validate_input(data):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--template", required=True)
+    ap.add_argument(
+        "--template", required=False, default=None,
+        help="Optional explicit template path. If omitted, resolved from --brand "
+             "(via brand_resolver.template_path).",
+    )
     ap.add_argument("--output", required=True)
-    add_brand_arg(ap)  # passive: accepted but ignored until brand migration
+    add_brand_arg(ap)
     args = ap.parse_args()
+
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    template_path = args.template or theme.template_path(SKILL_DIR, "executive-summary")
+    print(f"  ✓ Brand: {theme.id} ({theme.label})")
+    print(f"  ✓ Template: {template_path}")
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
+    # Roleup: source field is required (hard-fail). Stella: no-op (no requirement).
+    require_source(data, theme, skill_id=SKILL_ID)
     _validate_input(data)
-    prs = Presentation(args.template)
+
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), data.get("main_message", ""))
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), data.get("chart_title", "エグゼクティブサマリー"))
-    print(f"  ✓ Main Message & Chart Title set")
+    # Top / subtitle placeholder semantics differ between brands:
+    #  - stella: Title 1 = main_message (結論文), Text Placeholder 2 = chart_title
+    #  - roleup: Title 1 = chart_title (スライドタイトル), Text Placeholder 2 = main_message
+    top_text = resolve_top_text(data, theme)
+    sub_text = resolve_subtitle_text(data, theme)
+    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
+    print(f"  ✓ Top placeholder ({theme.top_placeholder_field()}): {top_text[:40]}")
+    print(f"  ✓ Subtitle placeholder ({theme.subtitle_placeholder_field()}): {sub_text[:40]}")
+
+    # Roleup: silently remove brown guide rectangles carried by template
+    # (matches cp/me/ch convention; stella template has no such shapes → no-op).
+    _silent_remove_shape(slide, "正方形/長方形 1")
+    _silent_remove_shape(slide, "正方形/長方形 8")
 
     findings = data.get("findings", [])
     if not findings:
@@ -431,15 +523,28 @@ def main():
         draw_finding(slide, i + 1, f, GRID_LEFT, top, GRID_WIDTH, finding_h)
         print(f"  ✓ Finding {i+1}: {f.get('heading', '')[:40]}...")
 
-    # 出典
+    # 出典: roleup は Source 3 placeholder にセット、stella は dynamic textbox を追加
     source = data.get("source", "")
     if source:
-        add_text_box(
-            slide, source,
-            SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.25),
-            FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
-            align=PP_ALIGN.LEFT,
-        )
+        if theme.id == "stellar_aiz":
+            add_text_box(
+                slide, source,
+                SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H,
+                FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
+                align=PP_ALIGN.LEFT,
+            )
+        else:
+            source_shape = find_shape(slide, SHAPE_SOURCE)
+            if source_shape is not None:
+                set_textbox_text(source_shape, source)
+            else:
+                # Brand has no Source 3 placeholder — fall back to dynamic textbox.
+                add_text_box(
+                    slide, source,
+                    SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H,
+                    FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
+                    align=PP_ALIGN.LEFT,
+                )
         print(f"  ✓ Source: {source[:40]}...")
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
