@@ -504,6 +504,7 @@ _COMMON_ROLEUP_RULES: list[Callable] = [
 PROFILES: dict[tuple, list[Callable]] = {
     ("customer-profile-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
     ("market-environment-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
+    ("market-share-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
     ("company-history-pptx", "roleup"): [
         # ch にはチャートが無いため C10/C12 を除外
         r for r in _COMMON_ROLEUP_RULES
@@ -520,6 +521,7 @@ PROFILES: dict[tuple, list[Callable]] = {
     ("market-environment-pptx", "stellar_aiz"): [], # TODO: ISSUE-010
     ("company-history-pptx", "stellar_aiz"): [],    # TODO: ISSUE-010
     ("executive-summary-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("market-share-pptx", "stellar_aiz"): [],       # TODO: ISSUE-010
 }
 
 

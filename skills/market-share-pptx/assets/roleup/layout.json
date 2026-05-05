@@ -1,0 +1,13 @@
+{
+  "_comment": "Roleup A4 horizontal (11.693×8.268 in). Subtitle/source coordinates derived from cp roleup layout.json. Left panel hosts doughnut chart, right panel hosts trend table; widths balanced for table readability.",
+  "panel_y_in": 1.55,
+  "left_x_in": 0.41,
+  "left_w_in": 5.23,
+  "left_h_in": 5.95,
+  "right_x_in": 6.07,
+  "right_w_in": 5.23,
+  "source_x_in": 0.41,
+  "source_y_in": 7.57,
+  "source_w_in": 10.88,
+  "source_h_in": 0.44
+}

@@ -2,7 +2,7 @@
 fill_market_share.py — 市場シェア分析スライドをPPTXネイティブオブジェクトで生成
 
 レイアウト:
-  - 上部: メインメッセージ + チャートタイトル
+  - 上部: メインメッセージ + チャートタイトル (top/subtitle 配置は brand により入れ替え)
   - 左側: 最新年の市場シェア・ドーナツチャート
   - 右側: 市場シェア推移テーブル（ランク、企業名、各年シェア、YoY変化）
     - 対象会社行はイエロー背景でハイライト
@@ -12,6 +12,7 @@ Usage:
   python fill_market_share.py \
     --data /home/claude/market_share_data.json \
     --template <path>/market-share-template.pptx \
+    --brand stellar_aiz | roleup \
     --output /mnt/user-data/outputs/MarketShare_output.pptx
 """
 
@@ -20,10 +21,13 @@ import json
 import os
 import sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+
+SKILL_ID = "market-share-pptx"
 
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
@@ -70,9 +74,10 @@ def _finalize_pptx(path):
 
 
 
-# ── Layout Constants (16:9) ──
+# ── Layout Constants (defaults; reassigned in main() via _apply_theme) ──
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE = "Text Placeholder 2"
+SHAPE_SOURCE = "Source 3"  # roleup template placeholder; stella adds dynamic textbox
 
 PANEL_Y = Inches(1.55)
 
@@ -88,15 +93,17 @@ RIGHT_W = Inches(6.60)
 SOURCE_X = Inches(0.41)
 SOURCE_Y = Inches(6.93)
 SOURCE_W = Inches(12.50)
+SOURCE_H = Inches(0.30)
 
-# ── Colors ──
+# ── Colors (defaults — reassigned by _apply_theme for roleup) ──
 COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
 COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
 COLOR_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+COLOR_SUBTITLE = RGBColor(0x33, 0x33, 0x33)  # stella: text color; roleup: subtitle color
 COLOR_HEADER_BG = RGBColor(0x2E, 0x4A, 0x6B)
 COLOR_HEADER_TEXT = RGBColor(0xFF, 0xFF, 0xFF)
 COLOR_ROW_ALT = RGBColor(0xF2, 0xF2, 0xF2)
-COLOR_HIGHLIGHT = RGBColor(0xFF, 0xF4, 0xC2)   # 対象会社行のハイライト（イエロー）
+COLOR_HIGHLIGHT = RGBColor(0xFF, 0xF4, 0xC2)   # 対象会社行のハイライト
 COLOR_UP = RGBColor(0x1B, 0x7A, 0x3B)          # 上昇（濃緑）
 COLOR_DOWN = RGBColor(0xC0, 0x3A, 0x3A)        # 下降（濃赤）
 COLOR_FLAT = RGBColor(0x66, 0x66, 0x66)        # 変化なし（グレー）
@@ -130,7 +137,7 @@ def _is_other_player(name: str) -> bool:
     )
 
 
-# 後方互換のためのエイリアス（既存コードからの参照用、削除する場合は他箇所も更新）
+# 後方互換のためのエイリアス
 DEFAULT_COLORS = CHART_PALETTE
 
 FONT_NAME_JP = "Meiryo UI"
@@ -140,6 +147,86 @@ FONT_SIZE_TABLE_HEADER = Pt(11)
 FONT_SIZE_SOURCE = Pt(10)
 FONT_SIZE_SUB = Pt(11)
 FONT_SIZE_TOTAL = Pt(12)
+FONT_SIZE_DATA_LABEL = Pt(10)
+
+# Theme module-global; populated in main() via _apply_theme(theme).
+_THEME = None
+
+
+def _apply_theme(theme):
+    """Reassign module-level brand-aware globals from a resolved BrandTheme.
+
+    Called once from main() after `--brand` is parsed. Stella (theme.id=="stellar_aiz")
+    must produce byte-identical output to the V1 hardcoded values for regression-zero.
+    """
+    global _THEME
+    global PANEL_Y, LEFT_X, LEFT_W, LEFT_H, RIGHT_X, RIGHT_W
+    global SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H
+    global COLOR_TEXT, COLOR_SOURCE, COLOR_SUBTITLE
+    global COLOR_HEADER_BG, COLOR_HEADER_TEXT, COLOR_ROW_ALT, COLOR_HIGHLIGHT
+    global CHART_PALETTE, OTHER_COLOR, TARGET_COLOR, LABEL_BAR_COLOR, LABEL_BG_COLOR
+    global FONT_NAME_JP, FONT_SIZE_SECTION, FONT_SIZE_TABLE, FONT_SIZE_TABLE_HEADER
+    global FONT_SIZE_SOURCE, FONT_SIZE_SUB, FONT_SIZE_TOTAL, FONT_SIZE_DATA_LABEL
+
+    _THEME = theme
+
+    PANEL_Y = theme.layout("panel_y_in")
+    LEFT_X = theme.layout("left_x_in")
+    LEFT_W = theme.layout("left_w_in")
+    LEFT_H = theme.layout("left_h_in")
+    RIGHT_X = theme.layout("right_x_in")
+    RIGHT_W = theme.layout("right_w_in")
+    SOURCE_X = theme.layout("source_x_in")
+    SOURCE_Y = theme.layout("source_y_in")
+    SOURCE_W = theme.layout("source_w_in")
+    SOURCE_H = theme.layout("source_h_in")
+
+    COLOR_TEXT = theme.color("text")
+    COLOR_SOURCE = theme.color("source")
+
+    FONT_NAME_JP = theme.font_ea
+    body_pt = theme.font_size_body_pt(skill_id=SKILL_ID)
+    FONT_SIZE_TABLE = body_pt
+    FONT_SIZE_TABLE_HEADER = body_pt
+    FONT_SIZE_SUB = body_pt
+    FONT_SIZE_DATA_LABEL = body_pt
+    FONT_SIZE_SOURCE = theme.pt("font_size_source_pt")
+
+    if theme.id == "roleup":
+        # Subtitle color (#897141) for section headings; brown header bg / target highlight.
+        COLOR_SUBTITLE = theme.color("subtitle")
+        COLOR_HEADER_BG = theme.color("label_bar")          # brown header
+        COLOR_HEADER_TEXT = RGBColor(0xFF, 0xFF, 0xFF)
+        COLOR_ROW_ALT = _hex_to_rgbcolor(theme.hex("label_bg"))
+        COLOR_HIGHLIGHT = theme.color("highlight_target")    # brown highlight
+        # roleup chart palette (8 brown tones).
+        CHART_PALETTE = list(theme.chart_palette[:8])
+        OTHER_COLOR = theme.hex("highlight_other")           # #CDCECE
+        TARGET_COLOR = theme.hex("highlight_target")         # #C78624
+        LABEL_BAR_COLOR = theme.hex("label_bar")
+        LABEL_BG_COLOR = theme.hex("label_bg")
+        FONT_SIZE_SECTION = theme.pt("font_size_subtitle_pt")    # 12pt
+        FONT_SIZE_TOTAL = theme.pt("font_size_key_message_pt")   # 14pt
+    else:
+        # Stella: keep V1 hardcoded values for regression-zero.
+        COLOR_SUBTITLE = COLOR_TEXT
+
+
+def _hex_to_rgbcolor(hex_str: str) -> RGBColor:
+    h = hex_str.lstrip("#")
+    return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
+def _silent_remove_shape(slide, shape_name: str) -> None:
+    """Remove a shape by name without printing a warning. No-op if absent.
+
+    Used for roleup brown rect guides that the cp-derived template carries but
+    market-share's chart+table layout does not need.
+    """
+    for s in list(slide.shapes):
+        if s.name == shape_name:
+            sp = s._element
+            sp.getparent().remove(sp)
 
 
 # ──────────────────────────────────────────────
@@ -175,31 +262,43 @@ def hex_to_rgb(hex_str):
 
 
 def add_section_title(slide, text, left, top, width):
-    """セクションタイトル（下線付き、14pt Bold）"""
+    """セクションタイトル
+    stella: 14pt Bold center + 黒下線
+    roleup: 12pt Bold left  + subtitle 色 (#897141), 下線なし
+    """
     txBox = slide.shapes.add_textbox(left, top, width, Inches(0.30))
     tf = txBox.text_frame
     tf.word_wrap = True
     tf.margin_left = 0; tf.margin_right = 0; tf.margin_top = 0; tf.margin_bottom = 0
     p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.CENTER
+    align_str = _THEME.layout_rule("subtitle_align", "center") if _THEME is not None else "center"
+    p.alignment = PP_ALIGN.LEFT if align_str == "left" else PP_ALIGN.CENTER
     run = p.add_run()
     run.text = text
     run.font.size = FONT_SIZE_SECTION
     run.font.bold = True
-    run.font.color.rgb = COLOR_TEXT
+    run.font.color.rgb = COLOR_SUBTITLE
     run.font.name = FONT_NAME_JP
 
-    line = slide.shapes.add_shape(
-        MSO_SHAPE.RECTANGLE, left, top + Inches(0.30), width, Inches(0.02)
-    )
-    line.fill.solid()
-    line.fill.fore_color.rgb = COLOR_TEXT
-    line.line.fill.background()
+    # 下線: stella のみ。roleup は subtitle 流儀で下線なし。
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        line = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE, left, top + Inches(0.30), width, Inches(0.02)
+        )
+        line.fill.solid()
+        line.fill.fore_color.rgb = COLOR_TEXT
+        line.line.fill.background()
     return txBox
 
 
 def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
-                 color=None, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP):
+                 color=None, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
+                 font_name=None):
+    # font_name / color default to current module globals (post-_apply_theme).
+    # Using None sentinel + late binding avoids capturing stella's pre-theme
+    # values when the function is defined at module load time.
+    if font_name is None:
+        font_name = FONT_NAME_JP
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
     tf.word_wrap = True
@@ -211,7 +310,7 @@ def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
     run.text = text
     run.font.size = font_size
     run.font.bold = bold
-    run.font.name = FONT_NAME_JP
+    run.font.name = font_name
     if color is not None:
         run.font.color.rgb = color
     else:
@@ -257,27 +356,27 @@ def build_doughnut_chart(slide, section_title, players, year_idx, year_label,
     chart = chart_shape.chart
     chart.has_title = False
 
-    # 凡例: 右側
-    chart.has_legend = True
-    chart.legend.position = XL_LEGEND_POSITION.RIGHT
-    chart.legend.include_in_layout = False
-    chart.legend.font.size = Pt(10)
-    chart.legend.font.name = FONT_NAME_JP
+    # 凡例: stella は内蔵 legend を右側に表示。roleup は has_legend=False とし、
+    # 右側のシェア推移テーブルに付く色マーカー (■) で凡例の役目を兼ねる。
+    if _THEME is None or _THEME.id == "stellar_aiz":
+        chart.has_legend = True
+        chart.legend.position = XL_LEGEND_POSITION.RIGHT
+        chart.legend.include_in_layout = False
+        chart.legend.font.size = Pt(10)
+        chart.legend.font.name = FONT_NAME_JP
 
-    # python-pptxのバグ対策: <c:legendPos/> にval属性を強制設定
-    # （val属性がないとOOXML仕様違反となり、PowerPointでスライドが白紙になる）
-    legend_elem = chart.legend._element
-    legendPos = legend_elem.find(qn("c:legendPos"))
-    if legendPos is not None and legendPos.get("val") is None:
-        legendPos.set("val", "r")
+        # python-pptx のバグ対策: <c:legendPos/> に val 属性を強制設定
+        legend_elem = chart.legend._element
+        legendPos = legend_elem.find(qn("c:legendPos"))
+        if legendPos is not None and legendPos.get("val") is None:
+            legendPos.set("val", "r")
+    else:
+        chart.has_legend = False
 
     # 系列に色を適用 + データラベル
     series = chart.series[0]
 
     # データラベル: etreeで全構築（python-pptxのsetterは使わない）
-    # python-pptxのsetterを使うと <c:dLblPos val="ctr"/> や <c:showLeaderLines>
-    # が自動追加され、PowerPoint for Mac で致命的修復エラーになるため。
-    # OOXMLスキーマ順（CT_DLbls）で子要素を構築する。
     dLbls_xml = series.data_labels._element
     for child in list(dLbls_xml):
         dLbls_xml.remove(child)
@@ -287,7 +386,7 @@ def build_doughnut_chart(slide, section_title, players, year_idx, year_label,
     numFmt.set("formatCode", '0.0"%"')
     numFmt.set("sourceLinked", "0")
 
-    # 2. txPr（font size/bold/name/color）
+    # 2. txPr
     txPr = etree.SubElement(dLbls_xml, qn("c:txPr"))
     bodyPr = etree.SubElement(txPr, qn("a:bodyPr"))
     bodyPr.set("wrap", "square")
@@ -297,7 +396,7 @@ def build_doughnut_chart(slide, section_title, players, year_idx, year_label,
     p_el = etree.SubElement(txPr, qn("a:p"))
     pPr = etree.SubElement(p_el, qn("a:pPr"))
     defRPr = etree.SubElement(pPr, qn("a:defRPr"))
-    defRPr.set("sz", "1000")  # 10pt (1/100 pt単位)
+    defRPr.set("sz", str(int(FONT_SIZE_DATA_LABEL.pt * 100)))
     defRPr.set("b", "1")
     solidFill = etree.SubElement(defRPr, qn("a:solidFill"))
     srgb = etree.SubElement(solidFill, qn("a:srgbClr"))
@@ -308,7 +407,7 @@ def build_doughnut_chart(slide, section_title, players, year_idx, year_label,
     endParaRPr = etree.SubElement(p_el, qn("a:endParaRPr"))
     endParaRPr.set("lang", "ja-JP")
 
-    # 3. dLblPos は意図的に省略（PowerPoint for Mac の修復エラーの真犯人）
+    # 3. dLblPos は意図的に省略
 
     # 4-9. showLegendKey 〜 showBubbleSize（OOXMLスキーマ順）
     for tag, val in (
@@ -321,15 +420,12 @@ def build_doughnut_chart(slide, section_title, players, year_idx, year_label,
     ):
         etree.SubElement(dLbls_xml, qn(tag)).set("val", val)
 
-    # 念のため、他経路で追加されうる showLeaderLines / leaderLines を除去
     for extra in ("c:showLeaderLines", "c:leaderLines"):
         for e in dLbls_xml.findall(qn(extra)):
             dLbls_xml.remove(e)
 
-    # 各カテゴリごとに色を設定 (data point level)
-    # python-pptxではdata points経由で色を個別設定
+    # 各カテゴリごとに色を設定
     for idx, p in enumerate(players):
-        # color は事前に main 側で強制割り当て済み（JSON の指定は無視されている）
         hex_color = p["color"]
         rgb = hex_to_rgb(hex_color)
         point = series.points[idx]
@@ -344,7 +440,6 @@ def build_doughnut_chart(slide, section_title, players, year_idx, year_label,
     plot_area = chart_xml.find(f'.//{{{ns}}}plotArea')
     doughnut = plot_area.find(f'.//{{{ns}}}doughnutChart')
     if doughnut is not None:
-        # holeSize要素を追加/更新
         holeSize = doughnut.find(f'{{{ns}}}holeSize')
         if holeSize is None:
             holeSize = etree.SubElement(doughnut, qn("c:holeSize"))
@@ -365,14 +460,12 @@ def build_trend_table(slide, section_title, players, years, target_company,
     """
     add_section_title(slide, section_title, left, top, width)
 
-    # 各プレイヤーをランキング順にソート（最新年基準）
-    # ただし「その他」系（前方一致）は最下段に固定
+    # 「その他」系は最下段に固定
     others = [p for p in players if _is_other_player(p.get("name", ""))]
     regular = [p for p in players if not _is_other_player(p.get("name", ""))]
     regular_sorted = sorted(regular, key=lambda p: p["shares"][-1], reverse=True)
     sorted_players = regular_sorted + others
 
-    # 列を構築
     cols = []
     if show_ranking:
         cols.append(("#", "rank"))
@@ -392,7 +485,6 @@ def build_trend_table(slide, section_title, players, years, target_company,
     shape = slide.shapes.add_table(n_rows, n_cols, left, tbl_top, width, tbl_h)
     table = shape.table
 
-    # 列幅の設定: ランク列は狭く、企業名列は広く、年・変化列は均等
     total_w = width
     rank_w = Inches(0.45) if show_ranking else Emu(0)
     yoy_w = Inches(1.05) if (show_yoy_change and len(years) >= 2) else Emu(0)
@@ -442,7 +534,6 @@ def build_trend_table(slide, section_title, players, years, target_company,
             cell = table.cell(r_idx + 1, c_idx)
 
             if key == "rank":
-                # 「その他」系はランク表記なし（前方一致）
                 if _is_other_player(p.get("name", "")):
                     text = "—"
                 else:
@@ -452,7 +543,6 @@ def build_trend_table(slide, section_title, players, years, target_company,
                             is_target=is_target, align_override="ctr")
 
             elif key == "name":
-                # color は事前に main 側で強制割り当て済み
                 color_hex = p["color"]
                 _style_cell(cell, p["name"], is_header=False, is_alt=is_alt,
                             font_size=FONT_SIZE_TABLE, bold=True,
@@ -525,7 +615,6 @@ def _style_cell(cell, text, is_header=False, is_alt=False, font_size=Pt(11),
     p_elem = etree.SubElement(tf._txBody, qn("a:p"))
     pPr = etree.SubElement(p_elem, qn("a:pPr"))
 
-    # 配置: is_headerは中央、bold(name列)は左、数値は右、align_overrideで上書き
     if align_override:
         pPr.set("algn", align_override)
     elif is_header:
@@ -541,7 +630,7 @@ def _style_cell(cell, text, is_header=False, is_alt=False, font_size=Pt(11),
     elif is_header:
         color_val = "FFFFFF"
     else:
-        color_val = "333333"
+        color_val = "{:02X}{:02X}{:02X}".format(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2])
 
     if color_marker_hex:
         # ■ 色付き + テキスト通常色の2 Run構成
@@ -596,13 +685,26 @@ def _style_cell(cell, text, is_header=False, is_alt=False, font_size=Pt(11),
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--template", required=True)
+    ap.add_argument(
+        "--template", required=False, default=None,
+        help="Optional explicit template path. If omitted, resolved from --brand "
+             "(via brand_resolver.template_path).",
+    )
     ap.add_argument("--output", required=True)
-    add_brand_arg(ap)  # passive: accepted but ignored until brand migration
+    add_brand_arg(ap)
     args = ap.parse_args()
+
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    template_path = args.template or theme.template_path(SKILL_DIR, "market-share")
+    print(f"  ✓ Brand: {theme.id} ({theme.label})")
+    print(f"  ✓ Template: {template_path}")
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # Roleup: source field is required (hard-fail). Stella: no-op (no requirement).
+    require_source(data, theme, skill_id=SKILL_ID)
 
     _mm = data.get("main_message", "")
     if len(_mm) > 65:
@@ -610,12 +712,21 @@ def main():
             f"main_message は 65 字以内（受領: {len(_mm)}）: {_mm[:80]}..."
         )
 
-    prs = Presentation(args.template)
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    # Main Message & Chart Title
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), data.get("main_message", ""))
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), data.get("chart_title", "市場シェア分析"))
+    # Top / subtitle placeholder semantics differ between brands:
+    #  - stella: Title 1 = main_message, Text Placeholder 2 = chart_title
+    #  - roleup: Title 1 = chart_title, Text Placeholder 2 = main_message
+    top_text = resolve_top_text(data, theme)
+    sub_text = resolve_subtitle_text(data, theme)
+    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE),
+                     sub_text or data.get("chart_title", "市場シェア分析"))
+
+    # Roleup: silently remove brown guide rectangles carried by cp-derived template.
+    _silent_remove_shape(slide, "正方形/長方形 1")
+    _silent_remove_shape(slide, "正方形/長方形 8")
 
     players = data.get("players", [])
     years = data.get("years", [])
@@ -624,9 +735,6 @@ def main():
         sys.exit(1)
 
     # 色の強制割り当て（共通パレット使用、JSON の color は無視）
-    # 「その他」系エントリは前方一致で OTHER_COLOR(灰) に上書き、
-    # それ以外は players 配列の index をそのまま使って palette を引く
-    # （P6/P7 で同じ社が同じ色になるよう、target/その他 をスキップせず配列 index で揃える）
     for i, p in enumerate(players):
         if _is_other_player(p.get("name", "")):
             p["color"] = OTHER_COLOR
@@ -658,15 +766,27 @@ def main():
         RIGHT_X, PANEL_Y, RIGHT_W,
     )
 
-    # 出典
+    # 出典: roleup は Source 3 placeholder にセット、stella は dynamic textbox を追加
     source = data.get("source", "")
     if source:
-        add_text_box(
-            slide, source,
-            SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.30),
-            FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
-            align=PP_ALIGN.LEFT,
-        )
+        if theme.id == "stellar_aiz":
+            add_text_box(
+                slide, source,
+                SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H,
+                FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
+                align=PP_ALIGN.LEFT,
+            )
+        else:
+            source_shape = find_shape(slide, SHAPE_SOURCE)
+            if source_shape is not None:
+                set_textbox_text(source_shape, source)
+            else:
+                add_text_box(
+                    slide, source,
+                    SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H,
+                    FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
+                    align=PP_ALIGN.LEFT,
+                )
         print(f"  ✓ Source: {source[:40]}...")
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)

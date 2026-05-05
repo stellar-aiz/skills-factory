@@ -1,0 +1,13 @@
+{
+  "_comment": "Stella 16:9 layout (13.33×7.50 in). Mirrors V1 hardcoded values in fill_market_share.py for regression-zero.",
+  "panel_y_in": 1.55,
+  "left_x_in": 0.41,
+  "left_w_in": 5.60,
+  "left_h_in": 5.35,
+  "right_x_in": 6.30,
+  "right_w_in": 6.60,
+  "source_x_in": 0.41,
+  "source_y_in": 6.93,
+  "source_w_in": 12.50,
+  "source_h_in": 0.30
+}

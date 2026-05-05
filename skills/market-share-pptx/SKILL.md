@@ -18,7 +18,7 @@ description: >
   - 「誰が業界1位か」「シェア変動」「市場集中度」を可視化したい要望
   - ユーザーが業界統計や各社シェアデータを貼り付けて、スライド化を求めた場合
   - 「HHI」「市場集中度」「市場シェア構造」をスライドにしたいという要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -178,9 +178,13 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_market_share.py \
   --data {{WORK_DIR}}/market_share_data.json \
-  --template <SKILL_DIR>/assets/market-share-template.pptx \
+  --brand stellar_aiz \
   --output {{OUTPUT_DIR}}/MarketShare_output.pptx
 ```
+
+`--brand` を `roleup` に切り替えると Roleup ブランド (A4 横、Yu Gothic UI、褐色アクセント) で生成。
+`--template` は省略可（brand から `assets/<brand>/market-share-template.pptx` を自動解決）。
+明示指定したい場合は `--template <SKILL_DIR>/assets/<brand>/market-share-template.pptx` を渡す。
 
 ---
 
