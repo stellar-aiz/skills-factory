@@ -541,12 +541,17 @@ V2 で各スキルに A4 横（11.69×8.27）+ Yu Gothic UI + 褐色アクセン
 - check_brand_compliance: cp + me roleup で 20/20 PASS
 - VALID_BRANDS 外部参照: brand_resolver.py 以外でゼロ確認
 
-### Phase 1 のタスク（次セッション以降）
+### Phase 1 進捗
 
-1. **frontmatter 一括追加** — 全 fill SKILL.md に `supported_brands: [stellar_aiz]` を機械的に追加（pilot 3 は `[stellar_aiz, roleup]`）
-2. **共通プロンプトのコピペ展開** — agent 7 件（market-overview / strategy-report / company-deepdive / business-deepdive / smallcap-strategy-research / bdd-init / comparison-synthesis-agent）の Step 0 に `step0_brand_clarification.md` を埋め込み
-3. **orchestrator に warning fallback 実装** — fill 起動前の `is_brand_supported_by_skill` 呼び出しと `merge_warnings.json` への brand_fallback 追記
-4. **E2E 1 本** — market-overview-agent × roleup で疎通確認
+- ✅ **(i) frontmatter 一括追加** — 全 fill SKILL.md に supported_brands を機械的追加（commit `5837223`、48 件 / pilot 3 = `[stellar_aiz, roleup]` / その他 = `[stellar_aiz]` / nttdata-pptx は除外で default `(stellar_aiz,)` 扱い、merge-pptxv2 は glob 不一致で自然除外）
+- ⏳ **(ii) 共通プロンプトのコピペ展開** — agent 7 件（market-overview / strategy-report / company-deepdive / business-deepdive / smallcap-strategy-research / bdd-init / comparison-synthesis-agent）の Step 0 に `step0_brand_clarification.md` を埋め込み
+- ⏳ **(iii) orchestrator に warning fallback 実装** — fill 起動前の `is_brand_supported_by_skill` 呼び出しと `merge_warnings.json`(または別ファイル) への brand_fallback 追記
+- ⏳ **(iv) E2E 1 本** — market-overview-agent × roleup で疎通確認
+
+**次セッションは (ii)+(iii) をまとめて実施**(密接に連動)。実装ヒント:
+- agent SKILL.md の Step 0 冒頭に `<!-- source: skills/_common/prompts/step0_brand_clarification.md (manual sync until D2) -->` コメント付きでコピペ
+- orchestrator は scope.json の brand 確定後、各 fill 起動 loop で `is_brand_supported_by_skill(skill_dir, scope_brand)` を呼ぶ
+- warning 蓄積先（既存 `merge_warnings.json` を流用するか、別ファイル `brand_warnings.json` を切るか）は (iii) 着手時に判断
 
 ### Phase 2（5-10 セッション）
 
