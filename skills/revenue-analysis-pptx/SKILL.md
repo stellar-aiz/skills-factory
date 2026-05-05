@@ -17,7 +17,7 @@ description: >
   - ユーザーがExcelファイルや財務データを提供して、売上分析スライドの作成を求めた場合
   - 「対象会社の財務推移をスライドにまとめて」「EBITDAマージンの推移」という要望
   - 「CAGR付きの売上チャート」「売上高の成長率をスライドに」という要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -136,13 +136,21 @@ EBITDA率は `ebitda / revenue * 100` で自動計算される。
 ```bash
 pip install python-pptx openpyxl -q --break-system-packages
 
+# 推奨: brand 指定で起動（template は brand_resolver で自動解決）
 python <SKILL_DIR>/scripts/fill_revenue_analysis.py \
+  --brand stellar_aiz \
   --data {{WORK_DIR}}/revenue_analysis_data.json \
-  --template <SKILL_DIR>/assets/revenue-analysis-template.pptx \
+  --output {{OUTPUT_DIR}}/RevenueAnalysis_output.pptx
+
+# Roleup 出力
+python <SKILL_DIR>/scripts/fill_revenue_analysis.py \
+  --brand roleup \
+  --data {{WORK_DIR}}/revenue_analysis_data.json \
   --output {{OUTPUT_DIR}}/RevenueAnalysis_output.pptx
 ```
 
-※ `<SKILL_DIR>` は実際のスキルインストールパスに置き換えること。
+`--template` を明示指定すると brand 解決を上書きできる（任意）。
+`<SKILL_DIR>` は実際のスキルインストールパスに置き換えること。
 
 ---
 
@@ -175,7 +183,10 @@ python <SKILL_DIR>/scripts/fill_revenue_analysis.py \
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/revenue-analysis-template.pptx` | スライドテンプレート |
+| `assets/stellar_aiz/revenue-analysis-template.pptx` | Stella 16:9 用テンプレート |
+| `assets/stellar_aiz/layout.json` | Stella 用レイアウト座標 |
+| `assets/roleup/revenue-analysis-template.pptx` | Roleup A4 横用テンプレート（cp roleup template から派生） |
+| `assets/roleup/layout.json` | Roleup 用レイアウト座標 |
 
 ## スクリプト
 

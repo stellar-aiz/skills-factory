@@ -1,15 +1,21 @@
 """
-fill_revenue_analysis.py - Revenue Analysis slide generator (v4)
+fill_revenue_analysis.py - Revenue Analysis slide generator (v5, brand-aware)
 
 Layout: Top = EBITDA margin line, Middle = CAGR arrow, Bottom = Grouped bar chart (Revenue + EBITDA)
-Grouped bar chart uses two series: Revenue (blue) and EBITDA (orange).
+Grouped bar chart uses two series: Revenue (accent_revenue_bar) and EBITDA (chart_palette[1]).
+
+Phase 2 (ISSUE-010): brand-aware で stellar_aiz / roleup を出し分け。
 """
 import argparse, json, math, os, sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+
+SKILL_ID = "revenue-analysis-pptx"
+
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.enum.text import PP_ALIGN
@@ -55,25 +61,128 @@ def _finalize_pptx(path):
 
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE = "Text Placeholder 2"
+SHAPE_SOURCE = "Source 3"
 
-# Upper zone: EBITDA margin line (shapes only)
+# Defaults (stella V1 values; reassigned in main() via _apply_theme).
 MARGIN_ZONE_TOP = Inches(1.80)
 MARGIN_ZONE_BOTTOM = Inches(3.10)
 
-# Lower zone: Native grouped bar chart
 CHART_LEFT = Inches(0.80)
 CHART_WIDTH = Inches(11.73)
 CHART_TOP = Inches(3.20)
 CHART_HEIGHT = Inches(3.70)
 
+SOURCE_X = Inches(0.41)
+SOURCE_Y = Inches(7.05)
+SOURCE_W = Inches(8.0)
+SOURCE_H = Inches(0.30)
+
 COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
-COLOR_BAR_REV = RGBColor(0x4E, 0x79, 0xA7)   # Revenue - steel blue
-COLOR_BAR_EBITDA = RGBColor(0xE1, 0x81, 0x2C)  # EBITDA - orange
+COLOR_BAR_REV = RGBColor(0x4E, 0x79, 0xA7)
+COLOR_BAR_EBITDA = RGBColor(0xE1, 0x81, 0x2C)
 COLOR_LINE = RGBColor(0x00, 0x33, 0x66)
 COLOR_CAGR = RGBColor(0x33, 0x33, 0x33)
+COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
+
+COLOR_BAR_REV_HEX = "4E79A7"
+COLOR_BAR_EBITDA_HEX = "E1812C"
+COLOR_DLBL_HEX = "333333"
+COLOR_LINE_HEX = "003366"
+
 FONT = "Meiryo UI"
 
+# Font sizes in pt (overwritten by _apply_theme).
+PT_AXIS = 11
+PT_DLBL_REV = 11
+PT_DLBL_EBITDA = 10
+PT_CAT_AXIS = 12
+PT_MARGIN_LBL = 12
+PT_CAGR = 16
+PT_LEGEND = 12
+PT_UNIT = 12
+PT_SOURCE = 10
+
 PLOT_L_PCT, PLOT_R_PCT, PLOT_T_PCT, PLOT_B_PCT = 0.07, 0.02, 0.04, 0.12
+
+# Theme module-global; populated in main() via _apply_theme(theme).
+_THEME = None
+
+
+def _apply_theme(theme):
+    """Reassign module-level brand-aware globals from a resolved BrandTheme."""
+    global _THEME
+    global MARGIN_ZONE_TOP, MARGIN_ZONE_BOTTOM
+    global CHART_LEFT, CHART_WIDTH, CHART_TOP, CHART_HEIGHT
+    global SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H
+    global COLOR_TEXT, COLOR_BAR_REV, COLOR_BAR_EBITDA, COLOR_LINE, COLOR_CAGR, COLOR_SOURCE
+    global COLOR_BAR_REV_HEX, COLOR_BAR_EBITDA_HEX, COLOR_DLBL_HEX, COLOR_LINE_HEX
+    global FONT
+    global PT_AXIS, PT_DLBL_REV, PT_DLBL_EBITDA, PT_CAT_AXIS, PT_MARGIN_LBL
+    global PT_CAGR, PT_LEGEND, PT_UNIT, PT_SOURCE
+
+    _THEME = theme
+
+    MARGIN_ZONE_TOP = theme.layout("margin_zone_top_in")
+    MARGIN_ZONE_BOTTOM = theme.layout("margin_zone_bottom_in")
+    CHART_LEFT = theme.layout("chart_left_in")
+    CHART_WIDTH = theme.layout("chart_width_in")
+    CHART_TOP = theme.layout("chart_top_in")
+    CHART_HEIGHT = theme.layout("chart_height_in")
+    SOURCE_X = theme.layout("source_x_in")
+    SOURCE_Y = theme.layout("source_y_in")
+    SOURCE_W = theme.layout("source_w_in")
+    SOURCE_H = theme.layout("source_h_in")
+
+    COLOR_TEXT = theme.color("text")
+    COLOR_BAR_REV = theme.color("accent_revenue_bar")
+    COLOR_LINE = theme.color("accent_op_margin_line")
+    COLOR_CAGR = theme.color("cagr_arrow")
+    COLOR_SOURCE = theme.color("source")
+
+    COLOR_BAR_REV_HEX = theme.hex_no_hash("accent_revenue_bar").upper()
+    COLOR_DLBL_HEX = theme.hex_no_hash("text").upper()
+    COLOR_LINE_HEX = theme.hex_no_hash("accent_op_margin_line").upper()
+
+    FONT = theme.font_ea
+
+    if theme.id == "stellar_aiz":
+        # V1 hardcoded values for regression-zero. Stella's chart_palette[1]
+        # (#F28E2B) is close to V1's #E1812C but not identical, so pin V1 hex.
+        COLOR_BAR_EBITDA = RGBColor(0xE1, 0x81, 0x2C)
+        COLOR_BAR_EBITDA_HEX = "E1812C"
+        PT_AXIS = 11
+        PT_DLBL_REV = 11
+        PT_DLBL_EBITDA = 10
+        PT_CAT_AXIS = 12
+        PT_MARGIN_LBL = 12
+        PT_CAGR = 16
+        PT_LEGEND = 12
+        PT_UNIT = 12
+        PT_SOURCE = 10
+    else:
+        # EBITDA = chart_palette[1] (#897141 beige for roleup, harmonious with
+        # accent_revenue_bar #7C4C2C and accent_op_margin_line #604C3F).
+        ebh = theme.chart_palette[1].lstrip("#").upper()
+        COLOR_BAR_EBITDA = RGBColor(int(ebh[0:2], 16), int(ebh[2:4], 16), int(ebh[4:6], 16))
+        COLOR_BAR_EBITDA_HEX = ebh
+        # Roleup C4 allowed set: {22, 14, 12, 10, 6}
+        body = theme.font_size_body_pt_value(skill_id=SKILL_ID)  # 10
+        PT_AXIS = body
+        PT_DLBL_REV = body
+        PT_DLBL_EBITDA = body
+        PT_CAT_AXIS = body
+        PT_MARGIN_LBL = body
+        PT_CAGR = 14  # subtitle/key-message size, in allowed set
+        PT_LEGEND = 12
+        PT_UNIT = body
+        PT_SOURCE = theme.pt_value("font_size_source_pt")  # 6
+
+
+def _silent_remove_shape(slide, shape_name):
+    for s in list(slide.shapes):
+        if s.name == shape_name:
+            sp = s._element
+            sp.getparent().remove(sp)
 
 
 def find_shape(slide, name):
@@ -131,7 +240,9 @@ def bar_top_y(val, amax):
     _, pt, _, pb = chart_plot_bounds()
     return pb - (val / amax * (pb - pt)) if amax > 0 else pb
 
-def add_dlabels(ser, pos='outEnd', fmt='#,##0', color='333333', sz=1100, bold=False):
+def add_dlabels(ser, pos='outEnd', fmt='#,##0', color=None, sz=None, bold=False):
+    if color is None: color = COLOR_DLBL_HEX
+    if sz is None: sz = PT_DLBL_REV * 100
     dl = ser.find(qn('c:dLbls'))
     if dl is None: dl = etree.SubElement(ser, qn('c:dLbls'))
     for c in list(dl): dl.remove(c)
@@ -205,6 +316,7 @@ def build_grouped_bar_chart(slide, jd):
     nf.set('formatCode', '#,##0'); nf.set('sourceLinked', '0')
 
     # Y-axis font
+    axis_sz = str(PT_AXIS * 100)
     tp = vax.find(qn('c:txPr'))
     if tp is None: tp = etree.SubElement(vax, qn('c:txPr'))
     bp = tp.find(qn('a:bodyPr'))
@@ -215,23 +327,23 @@ def build_grouped_bar_chart(slide, jd):
     pp = p.find(qn('a:pPr'))
     if pp is None: pp = etree.SubElement(p, qn('a:pPr'))
     dr = pp.find(qn('a:defRPr'))
-    if dr is None: dr = etree.SubElement(pp, qn('a:defRPr'), attrib={'sz':'1100'})
-    else: dr.set('sz', '1100')
+    if dr is None: dr = etree.SubElement(pp, qn('a:defRPr'), attrib={'sz': axis_sz})
+    else: dr.set('sz', axis_sz)
     if dr.find(qn('a:latin')) is None: etree.SubElement(dr, qn('a:latin'), attrib={'typeface': FONT})
     if dr.find(qn('a:ea')) is None: etree.SubElement(dr, qn('a:ea'), attrib={'typeface': FONT})
     asf = dr.find(qn('a:solidFill'))
     if asf is None: asf = etree.SubElement(dr, qn('a:solidFill'))
     for c in list(asf): asf.remove(c)
-    etree.SubElement(asf, qn('a:srgbClr'), attrib={'val': '333333'})
+    etree.SubElement(asf, qn('a:srgbClr'), attrib={'val': COLOR_DLBL_HEX})
 
     # Series colors
     sers = bc.findall(qn('c:ser'))
-    set_ser_color(sers[0], '4E79A7')  # Revenue - blue
-    set_ser_color(sers[1], 'E1812C')  # EBITDA - orange
+    set_ser_color(sers[0], COLOR_BAR_REV_HEX)
+    set_ser_color(sers[1], COLOR_BAR_EBITDA_HEX)
 
     # Data labels
-    add_dlabels(sers[0], 'outEnd', '#,##0', '333333', 1100, True)   # Revenue
-    add_dlabels(sers[1], 'outEnd', '#,##0', '333333', 1000, False)  # EBITDA
+    add_dlabels(sers[0], 'outEnd', '#,##0', COLOR_DLBL_HEX, PT_DLBL_REV * 100, True)
+    add_dlabels(sers[1], 'outEnd', '#,##0', COLOR_DLBL_HEX, PT_DLBL_EBITDA * 100, False)
 
     chart.has_legend = False
 
@@ -248,6 +360,7 @@ def build_grouped_bar_chart(slide, jd):
     gw.set('val', '80')
 
     # Cat axis font
+    cat_sz = str(PT_CAT_AXIS * 100)
     for ax in pa.findall(qn('c:catAx')):
         de2 = ax.find(qn('c:delete'))
         if de2 is not None and de2.get('val') == '1': continue
@@ -262,8 +375,8 @@ def build_grouped_bar_chart(slide, jd):
         pp2 = p2.find(qn('a:pPr'))
         if pp2 is None: pp2 = etree.SubElement(p2, qn('a:pPr'))
         dr2 = pp2.find(qn('a:defRPr'))
-        if dr2 is None: dr2 = etree.SubElement(pp2, qn('a:defRPr'), attrib={'sz':'1200','b':'1'})
-        else: dr2.set('sz','1200'); dr2.set('b','1')
+        if dr2 is None: dr2 = etree.SubElement(pp2, qn('a:defRPr'), attrib={'sz': cat_sz, 'b': '1'})
+        else: dr2.set('sz', cat_sz); dr2.set('b', '1')
         if dr2.find(qn('a:latin')) is None: etree.SubElement(dr2, qn('a:latin'), attrib={'typeface': FONT})
         if dr2.find(qn('a:ea')) is None: etree.SubElement(dr2, qn('a:ea'), attrib={'typeface': FONT})
 
@@ -319,7 +432,7 @@ def draw_margin_line(slide, jd):
         tf = tb.text_frame; tf.word_wrap = False
         p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
         r = p.add_run(); r.text = f"{margins[i]:.1f}%"
-        r.font.size = Pt(12); r.font.bold = True
+        r.font.size = Pt(PT_MARGIN_LBL); r.font.bold = True
         r.font.color.rgb = COLOR_LINE; r.font.name = FONT
 
     print(f"  Margin line: {n} pts, {mn:.1f}%-{mx:.1f}%")
@@ -358,7 +471,7 @@ def add_cagr(slide, jd, amax):
     tf = ov.text_frame; tf.word_wrap = False
     p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
     r = p.add_run(); r.text = txt
-    r.font.size = Pt(16); r.font.bold = True
+    r.font.size = Pt(PT_CAGR); r.font.bold = True
     r.font.color.rgb = COLOR_TEXT; r.font.name = FONT
     print(f"  CAGR: {txt}")
 
@@ -382,7 +495,7 @@ def add_legend(slide, jd, left, top, width):
     tb1 = slide.shapes.add_textbox(int(cur_x), top, Inches(0.70), lh)
     tf1 = tb1.text_frame; tf1.word_wrap = False
     p1 = tf1.paragraphs[0]; p1.alignment = PP_ALIGN.LEFT
-    r1 = p1.add_run(); r1.text = rev_label; r1.font.size = Pt(12)
+    r1 = p1.add_run(); r1.text = rev_label; r1.font.size = Pt(PT_LEGEND)
     r1.font.color.rgb = COLOR_TEXT; r1.font.name = FONT
     cur_x += Inches(0.85)
 
@@ -393,7 +506,7 @@ def add_legend(slide, jd, left, top, width):
     tb2 = slide.shapes.add_textbox(int(cur_x), top, Inches(0.80), lh)
     tf2 = tb2.text_frame; tf2.word_wrap = False
     p2 = tf2.paragraphs[0]; p2.alignment = PP_ALIGN.LEFT
-    r2 = p2.add_run(); r2.text = "EBITDA"; r2.font.size = Pt(12)
+    r2 = p2.add_run(); r2.text = "EBITDA"; r2.font.size = Pt(PT_LEGEND)
     r2.font.color.rgb = COLOR_TEXT; r2.font.name = FONT
     cur_x += Inches(1.00)
 
@@ -409,44 +522,73 @@ def add_legend(slide, jd, left, top, width):
     tb3 = slide.shapes.add_textbox(int(cur_x), top, Inches(1.20), lh)
     tf3 = tb3.text_frame; tf3.word_wrap = False
     p3 = tf3.paragraphs[0]; p3.alignment = PP_ALIGN.LEFT
-    r3 = p3.add_run(); r3.text = line_label; r3.font.size = Pt(12)
+    r3 = p3.add_run(); r3.text = line_label; r3.font.size = Pt(PT_LEGEND)
     r3.font.color.rgb = COLOR_TEXT; r3.font.name = FONT
 
 
 def add_unit(slide, text, left, top):
     tb = slide.shapes.add_textbox(left, top, Inches(3.0), Inches(0.22))
     tf = tb.text_frame; p = tf.paragraphs[0]; p.alignment = PP_ALIGN.LEFT
-    r = p.add_run(); r.text = text; r.font.size = Pt(12)
+    r = p.add_run(); r.text = text; r.font.size = Pt(PT_UNIT)
     r.font.color.rgb = COLOR_TEXT; r.font.name = FONT
 
-def add_source(slide, text):
-    tb = slide.shapes.add_textbox(Inches(0.41), Inches(7.05), Inches(8.0), Inches(0.30))
+
+def add_source_dynamic(slide, text):
+    """Stella: dynamic textbox at SOURCE_X/Y (V1 behaviour)."""
+    tb = slide.shapes.add_textbox(SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H)
     tf = tb.text_frame; tf.word_wrap = True
     p = tf.paragraphs[0]; p.alignment = PP_ALIGN.LEFT
-    r = p.add_run(); r.text = text; r.font.size = Pt(10)
-    r.font.color.rgb = RGBColor(0x66,0x66,0x66); r.font.name = FONT
+    r = p.add_run(); r.text = text; r.font.size = Pt(PT_SOURCE)
+    r.font.color.rgb = COLOR_SOURCE; r.font.name = FONT
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--template", required=True)
+    ap.add_argument(
+        "--template", required=False, default=None,
+        help="Optional explicit template path. If omitted, resolved from --brand "
+             "(via brand_resolver.template_path).",
+    )
     ap.add_argument("--output", required=True)
-    add_brand_arg(ap)  # passive: accepted but ignored until brand migration
+    add_brand_arg(ap)
     args = ap.parse_args()
-    with open(args.data, "r", encoding="utf-8") as f: jd = json.load(f)
 
-    prs = Presentation(args.template)
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    template_path = args.template or theme.template_path(SKILL_DIR, "revenue-analysis")
+    print(f"  ✓ Brand: {theme.id} ({theme.label})")
+    print(f"  ✓ Template: {template_path}")
+
+    with open(args.data, "r", encoding="utf-8") as f:
+        jd = json.load(f)
+
+    # Roleup: source field is required (hard-fail). Stella: no-op.
+    require_source(jd, theme, skill_id=SKILL_ID)
+
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    set_text(find_shape(slide, SHAPE_MAIN_MESSAGE), jd.get("main_message",""))
-    print(f"  Main Message: {jd.get('main_message','')}")
-    set_text(find_shape(slide, SHAPE_CHART_TITLE), jd.get("chart_title","売上分析ー売上高・EBITDAの推移"))
-    print(f"  Chart Title: {jd.get('chart_title','')}")
+    # Top / subtitle placeholder semantics differ between brands:
+    #   stella: Title 1 = main_message (結論文), Text Placeholder 2 = chart_title
+    #   roleup: Title 1 = chart_title (スライドタイトル), Text Placeholder 2 = main_message
+    top_text = resolve_top_text(jd, theme)
+    sub_text = resolve_subtitle_text(jd, theme) or "売上分析ー売上高・EBITDAの推移"
+    set_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+    set_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
+    print(f"  ✓ Top placeholder ({theme.top_placeholder_field()}): {top_text[:40]}")
+    print(f"  ✓ Subtitle placeholder ({theme.subtitle_placeholder_field()}): {sub_text[:40]}")
+
+    # Stella template carries Table 1 placeholder; roleup template does not.
+    # remove_shape is a no-op when shape is absent.
     remove_shape(slide, "Table 1")
 
+    # Roleup: silently remove brown guide rectangles carried by template.
+    _silent_remove_shape(slide, "正方形/長方形 1")
+    _silent_remove_shape(slide, "正方形/長方形 8")
+
     lt = MARGIN_ZONE_TOP - Inches(0.25)
-    ul = jd.get("unit_label","（単位：百万円、%）")
+    ul = jd.get("unit_label", "（単位：百万円、%）")
     if ul: add_unit(slide, ul, CHART_LEFT, lt)
     add_legend(slide, jd, CHART_LEFT, lt, CHART_WIDTH)
 
@@ -454,8 +596,17 @@ def main():
     cf, amax = build_grouped_bar_chart(slide, jd)
     add_cagr(slide, jd, amax)
 
-    src = jd.get("source","")
-    if src: add_source(slide, src)
+    src = jd.get("source", "")
+    if src:
+        if theme.id == "stellar_aiz":
+            add_source_dynamic(slide, src)
+        else:
+            source_shape = find_shape(slide, SHAPE_SOURCE)
+            if source_shape is not None:
+                set_text(source_shape, src)
+            else:
+                add_source_dynamic(slide, src)
+        print(f"  ✓ Source: {src[:40]}")
 
     outdir = os.path.dirname(args.output)
     if outdir: os.makedirs(outdir, exist_ok=True)

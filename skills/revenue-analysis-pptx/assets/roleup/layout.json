@@ -1,0 +1,13 @@
+{
+  "_comment": "Roleup A4 horizontal (11.693×8.268 in). subtitle ~1.55, source y=7.57 (cp roleup layout 準拠). margin zone 1.30 in (stella 同等)、chart は 2.85-7.30 (4.45 in)。chart 内訳: 上部 margin line + 下部 grouped bar.",
+  "margin_zone_top_in": 1.55,
+  "margin_zone_bottom_in": 2.85,
+  "chart_left_in": 0.41,
+  "chart_top_in": 2.85,
+  "chart_width_in": 10.88,
+  "chart_height_in": 4.45,
+  "source_x_in": 0.41,
+  "source_y_in": 7.57,
+  "source_w_in": 10.88,
+  "source_h_in": 0.44
+}

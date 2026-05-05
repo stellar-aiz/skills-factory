@@ -1,0 +1,13 @@
+{
+  "_comment": "Stella 16:9 layout (13.33×7.50 in). Mirrors V1 hardcoded values in fill_revenue_analysis.py for regression-zero.",
+  "margin_zone_top_in": 1.80,
+  "margin_zone_bottom_in": 3.10,
+  "chart_left_in": 0.80,
+  "chart_top_in": 3.20,
+  "chart_width_in": 11.73,
+  "chart_height_in": 3.70,
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 8.00,
+  "source_h_in": 0.30
+}
