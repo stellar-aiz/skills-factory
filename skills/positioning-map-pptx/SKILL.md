@@ -18,7 +18,7 @@ description: >
   - 「対象会社はどこにいるか」「差別化の余地」を可視化したい要望
   - ユーザーが各社の特徴データを貼り付けて、2軸マッピングのスライド化を求めた場合
   - 「市場マップ」「競合地図」「戦略グループ分析」をスライドにしたいという要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -204,9 +204,13 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_positioning_map.py \
   --data {{WORK_DIR}}/positioning_map_data.json \
-  --template <SKILL_DIR>/assets/positioning-map-template.pptx \
+  --brand stellar_aiz \
   --output {{OUTPUT_DIR}}/PositioningMap_output.pptx
 ```
+
+`--brand` を `roleup` に切り替えると Roleup ブランド (A4 横、Yu Gothic UI、褐色アクセント) で生成。
+roleup ではマップが狭くなるため、バブルラベル幅を縮小し、上部 quadrant ラベルを枠外に配置する自動調整が入る。
+`--template` は省略可（brand から `assets/<brand>/positioning-map-template.pptx` を自動解決）。
 
 ---
 
