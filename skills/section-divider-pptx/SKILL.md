@@ -12,7 +12,7 @@ description: >
   - 「セクションごとの区切りページ」「タイトルスライド」「セクション開始ページ」という要望
   - 企業調査デッキの各セクション冒頭の中扉作成
   - 「目次のセクションごとに区切りスライドを入れたい」という要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -102,9 +102,13 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_section_divider.py \
   --data {{WORK_DIR}}/section_divider_data.json \
-  --template <SKILL_DIR>/assets/section-divider-template.pptx \
+  --brand stellar_aiz \
   --output {{OUTPUT_DIR}}/SectionDivider_output.pptx
 ```
+
+`--brand` は `stellar_aiz`（既定、16:9 / Meiryo UI / 7 色ローテ）か `roleup`
+（A4 横 / Yu Gothic UI / theme.chart_palette 8 色ローテ）を指定。
+`--template` を省略すると brand に応じたテンプレートが自動解決される。
 
 ---
 
@@ -122,8 +126,11 @@ python <SKILL_DIR>/scripts/fill_section_divider.py \
 
 | ファイル | 用途 |
 |---|---|
-| `assets/section-divider-template.pptx` | スライドテンプレート |
-| `scripts/fill_section_divider.py` | 生成スクリプト |
+| `assets/stellar_aiz/section-divider-template.pptx` | スライドテンプレート (stellar_aiz, 16:9) |
+| `assets/stellar_aiz/layout.json` | stellar_aiz レイアウト座標 (V1 hardcode 値ミラー) |
+| `assets/roleup/section-divider-template.pptx` | スライドテンプレート (roleup, A4 横) |
+| `assets/roleup/layout.json` | roleup レイアウト座標 (slide_h 8.27 in に合わせ下方シフト) |
+| `scripts/fill_section_divider.py` | 生成スクリプト (Pattern A: brand-aware) |
 | `references/sample_data.json` | サンプル（Section 03 マクロ・市場環境分析） |
 
 ---

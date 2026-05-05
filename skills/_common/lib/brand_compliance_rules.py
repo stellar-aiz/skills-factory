@@ -536,6 +536,24 @@ PROFILES: dict[tuple, list[Callable]] = {
         r for r in _COMMON_ROLEUP_RULES
         if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
     ],
+    ("section-divider-pptx", "roleup"): [
+        # 中扉は装飾スライド: 巨大数字 (180pt) と SECTION ラベル textbox が
+        # 完全包含で C11 を必ず fail させる + Title 1 / Source 3 placeholder を削除する設計のため
+        # C2/C5/C6 適用不可、本文サイズも装飾 (180/22pt) のため C4 不適用。
+        # 適用するのは C1 (ガイド矩形除去) / C7 (slide size) / C8 (font name) のみ。
+        rule_no_guide_rectangles, rule_slide_size, rule_font_name,
+    ],
+    ("table-of-contents-pptx", "roleup"): [
+        # TOC はチャート不在のため C10/C12 を除外。残り 8 ルール適用。
+        r for r in _COMMON_ROLEUP_RULES
+        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
+    ],
+    ("data-availability-pptx", "roleup"): [
+        # data-availability はテーブル+textbox 構成、チャート不在のため C10/C12 を除外。
+        # 残り 8 ルール (C1/C2/C4/C5/C6/C7/C8/C11) を適用。
+        r for r in _COMMON_ROLEUP_RULES
+        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
+    ],
     # stella 版は ISSUE-010 で stella 仕様確定後に追加 (現状 skeleton)
     ("customer-profile-pptx", "stellar_aiz"): [],   # TODO: ISSUE-010
     ("market-environment-pptx", "stellar_aiz"): [], # TODO: ISSUE-010
@@ -546,6 +564,9 @@ PROFILES: dict[tuple, list[Callable]] = {
     ("competitor-summary-pptx", "stellar_aiz"): [], # TODO: ISSUE-010
     ("market-kbf-pptx", "stellar_aiz"): [],         # TODO: ISSUE-010
     ("pest-analysis-pptx", "stellar_aiz"): [],      # TODO: ISSUE-010
+    ("section-divider-pptx", "stellar_aiz"): [],    # TODO: ISSUE-010
+    ("table-of-contents-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("data-availability-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
 }
 
 

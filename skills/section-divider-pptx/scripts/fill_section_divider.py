@@ -2,17 +2,20 @@
 fill_section_divider.py — 中扉（Section Divider）スライドを生成
 
 レイアウト:
-  - 上部1/3: 大きなセクション番号（薄色背景）
-  - 中央: セクションタイトル（大）
-  - サブタイトル（中）
-  - 下部: そのセクションで扱うトピックリスト（オプション）
+  - 左半分: アクセントカラー背景 + 巨大なセクション番号（180pt 白） + "SECTION" ラベル
+  - 右半分: タイトル / アクセントライン / サブタイトル / トピックリスト
 
-レポート内のセクション区切りに使う。
+Brand-aware (Phase 2, ISSUE-010):
+  --brand stellar_aiz : 13.33×7.50 in / Meiryo UI / 既存 7 色ローテーション (hardcode 値維持)
+  --brand roleup      : 11.69×8.27 in / Yu Gothic UI / theme.chart_palette 8 色ローテ
+
+中扉は装飾スライド (大フォント主体) のため C4 (font size constraint) と
+C2/C5/C6 (title/source) は profile から除外し、C1/C7/C8/C11 のみ適用する。
 
 Usage:
   python fill_section_divider.py \
     --data /home/claude/section_divider_data.json \
-    --template <path>/section-divider-template.pptx \
+    --brand stellar_aiz \
     --output /mnt/user-data/outputs/SectionDivider_output.pptx
 """
 
@@ -21,10 +24,12 @@ import json
 import os
 import sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+
+SKILL_ID = "section-divider-pptx"
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
@@ -69,19 +74,43 @@ def _finalize_pptx(path):
 
 
 
+# ── Template placeholder shape names (cp roleup template / stella legacy 共通) ──
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE = "Text Placeholder 2"
+SHAPE_SOURCE_ROLEUP = "Source 3"  # roleup template carries; we delete (中扉に出典は不要)
 
-# 中扉は全画面を活用
+# ── Default values (stella) — reassigned in main() via _apply_theme(theme) ──
+# Layout (mirrors V1 hardcoded values for stella regression-zero).
+LEFT_PANEL_W = Inches(5.50)
+NUM_TOP = Inches(1.50)
+NUM_H = Inches(4.50)
+LABEL_TOP = Inches(2.60)
+LABEL_H = Inches(0.40)
+RIGHT_X_OFFSET = Inches(0.50)
+RIGHT_PAD_RIGHT = Inches(0.50)
+TITLE_TOP = Inches(2.30)
+TITLE_H = Inches(1.20)
+ACCENT_LINE_TOP = Inches(3.35)
+ACCENT_LINE_W = Inches(1.00)
+ACCENT_LINE_H = Emu(int(Inches(0.06)))
+SUBTITLE_TOP = Inches(3.55)
+SUBTITLE_H = Inches(0.50)
+TOPICS_TOP = Inches(4.30)
+TOPIC_LABEL_H = Inches(0.30)
+TOPIC_OFFSET = Inches(0.10)
+TOPIC_H = Inches(2.00)
+
+# Slide size (stella default; reassigned to roleup A4 in _apply_theme).
 SLIDE_W = Inches(13.33)
 SLIDE_H = Inches(7.50)
 
+# Colors (stella default).
 COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
 COLOR_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 COLOR_SUBTEXT = RGBColor(0x66, 0x66, 0x66)
 
-# セクション色のローテーション（TOCと統一）
-SECTION_COLORS = [
+# Section accent color rotations (stella legacy: 7 colors).
+SECTION_COLORS_STELLA = [
     RGBColor(0x2E, 0x4A, 0x6B),   # 紺
     RGBColor(0x7B, 0x4F, 0xB0),   # 紫
     RGBColor(0x2E, 0x6F, 0xBF),   # 青
@@ -91,11 +120,103 @@ SECTION_COLORS = [
     RGBColor(0x59, 0x59, 0x59),   # グレー
 ]
 
+# Fonts (stella defaults).
 FONT_NAME_JP = "Meiryo UI"
-FONT_SIZE_BIG_NUMBER = Pt(180)   # 巨大なセクション番号
-FONT_SIZE_SECTION_TITLE = Pt(36)
+FONT_NAME_LATIN = "Arial"
+FONT_SIZE_BIG_NUMBER = Pt(180)   # 巨大なセクション番号 (装飾、C4 検査対象外)
+FONT_SIZE_SECTION_LABEL = Pt(20) # SECTION ラベル
+FONT_SIZE_SECTION_TITLE = Pt(36) # セクションタイトル
 FONT_SIZE_SUBTITLE = Pt(18)
 FONT_SIZE_TOPIC = Pt(13)
+
+# Theme module-global; populated in main() via _apply_theme(theme).
+_THEME = None
+
+
+def _apply_theme(theme):
+    """Reassign module-level brand-aware globals from a resolved BrandTheme.
+
+    Called once from main() after `--brand` is parsed.
+    """
+    global _THEME, SLIDE_W, SLIDE_H
+    global LEFT_PANEL_W, NUM_TOP, NUM_H, LABEL_TOP, LABEL_H
+    global RIGHT_X_OFFSET, RIGHT_PAD_RIGHT, TITLE_TOP, TITLE_H
+    global ACCENT_LINE_TOP, ACCENT_LINE_W, ACCENT_LINE_H
+    global SUBTITLE_TOP, SUBTITLE_H, TOPICS_TOP, TOPIC_LABEL_H, TOPIC_OFFSET, TOPIC_H
+    global COLOR_TEXT, COLOR_SUBTEXT
+    global FONT_NAME_JP, FONT_NAME_LATIN
+    global FONT_SIZE_BIG_NUMBER, FONT_SIZE_SECTION_LABEL, FONT_SIZE_SECTION_TITLE
+    global FONT_SIZE_SUBTITLE, FONT_SIZE_TOPIC
+
+    _THEME = theme
+
+    SLIDE_W = theme.slide_w
+    SLIDE_H = theme.slide_h
+
+    LEFT_PANEL_W = theme.layout("left_panel_w_in")
+    NUM_TOP = theme.layout("num_top_in")
+    NUM_H = theme.layout("num_h_in")
+    LABEL_TOP = theme.layout("label_top_in")
+    LABEL_H = theme.layout("label_h_in")
+    RIGHT_X_OFFSET = theme.layout("right_x_offset_in")
+    RIGHT_PAD_RIGHT = theme.layout("right_pad_right_in")
+    TITLE_TOP = theme.layout("title_top_in")
+    TITLE_H = theme.layout("title_h_in")
+    ACCENT_LINE_TOP = theme.layout("accent_line_top_in")
+    ACCENT_LINE_W = theme.layout("accent_line_w_in")
+    ACCENT_LINE_H = Emu(int(theme.layout("accent_line_h_in")))
+    SUBTITLE_TOP = theme.layout("subtitle_top_in")
+    SUBTITLE_H = theme.layout("subtitle_h_in")
+    TOPICS_TOP = theme.layout("topics_top_in")
+    TOPIC_LABEL_H = theme.layout("topic_label_h_in")
+    TOPIC_OFFSET = theme.layout("topic_offset_in")
+    TOPIC_H = theme.layout("topic_h_in")
+
+    COLOR_TEXT = theme.color("text")
+    # subtitle 色は brand 別の subtitle 色を使う (roleup=#897141, stella=#333333)
+    COLOR_SUBTEXT = theme.color("subtitle") if "subtitle" in theme._colors else COLOR_TEXT
+
+    FONT_NAME_JP = theme.font_ea
+    FONT_NAME_LATIN = theme.font_latin
+
+    # roleup では本文系を許容集合 {22, 14, 12, 10, 6} に収める。
+    # 装飾的大フォント (BIG_NUMBER 180pt / SECTION_TITLE) は C4 検査対象外 (profile で除外)。
+    if theme.id == "stellar_aiz":
+        FONT_SIZE_BIG_NUMBER = Pt(180)
+        FONT_SIZE_SECTION_LABEL = Pt(20)
+        FONT_SIZE_SECTION_TITLE = Pt(36)
+        FONT_SIZE_SUBTITLE = Pt(18)
+        FONT_SIZE_TOPIC = Pt(13)
+    else:
+        # roleup: 巨大数字とセクションタイトルは装飾扱い (C4 除外プロファイル)、
+        # SECTION ラベル / サブタイトル / トピックは許容集合内へ。
+        FONT_SIZE_BIG_NUMBER = Pt(180)
+        FONT_SIZE_SECTION_LABEL = Pt(12)
+        FONT_SIZE_SECTION_TITLE = Pt(22)
+        FONT_SIZE_SUBTITLE = Pt(12)
+        FONT_SIZE_TOPIC = Pt(10)
+
+
+def _silent_remove_shape(slide, shape_name: str) -> None:
+    """Remove a shape by name without printing a warning. No-op if absent."""
+    for s in list(slide.shapes):
+        if s.name == shape_name:
+            sp = s._element
+            sp.getparent().remove(sp)
+
+
+def _section_color(theme, section_number: int) -> RGBColor:
+    """Resolve accent color for a section number.
+
+    stella: 7 色 hardcode ローテ (V1 互換)
+    roleup: theme.chart_palette (8 色) ローテ
+    """
+    if theme.id == "stellar_aiz":
+        return SECTION_COLORS_STELLA[(section_number - 1) % len(SECTION_COLORS_STELLA)]
+    palette = theme.chart_palette
+    hex_str = palette[(section_number - 1) % len(palette)]
+    h = hex_str.lstrip("#")
+    return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
 def find_shape(slide, name):
@@ -107,7 +228,12 @@ def find_shape(slide, name):
 
 def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
                  color=None, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
-                 font_name=FONT_NAME_JP):
+                 font_name=None):
+    # font_name / color default to current module globals (post-_apply_theme).
+    if font_name is None:
+        font_name = FONT_NAME_JP
+    if color is None:
+        color = COLOR_TEXT
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
     tf.word_wrap = True
@@ -121,10 +247,7 @@ def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
     run.font.size = font_size
     run.font.bold = bold
     run.font.name = font_name
-    if color is not None:
-        run.font.color.rgb = color
-    else:
-        run.font.color.rgb = COLOR_TEXT
+    run.font.color.rgb = color
     return tb
 
 
@@ -134,9 +257,15 @@ def hex_to_rgb(hex_str):
 
 
 def remove_template_shapes(slide):
-    """テンプレートのプレースホルダー（Title 1, Text Placeholder 2）を削除して中扉を一から組む"""
+    """テンプレートのプレースホルダーを削除して中扉を一から組む。
+
+    cp roleup template には Title 1 / Text Placeholder 2 / Source 3 + 茶色ガイド × 2
+    が含まれるが、中扉専用デザインのため全て削除する。
+    """
+    targets = (SHAPE_MAIN_MESSAGE, SHAPE_CHART_TITLE, SHAPE_SOURCE_ROLEUP,
+               "正方形/長方形 1", "正方形/長方形 8")
     for sh in list(slide.shapes):
-        if sh.name in (SHAPE_MAIN_MESSAGE, SHAPE_CHART_TITLE):
+        if sh.name in targets:
             sp_tree = slide.shapes._spTree
             sp_tree.remove(sh._element)
 
@@ -144,18 +273,28 @@ def remove_template_shapes(slide):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--template", required=True)
+    ap.add_argument(
+        "--template", required=False, default=None,
+        help="Optional explicit template path. If omitted, resolved from --brand "
+             "(via brand_resolver.template_path).",
+    )
     ap.add_argument("--output", required=True)
-    add_brand_arg(ap)  # passive: accepted but ignored until brand migration
+    add_brand_arg(ap)
     args = ap.parse_args()
+
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    template_path = args.template or theme.template_path(SKILL_DIR, "section-divider")
+    print(f"  ✓ Brand: {theme.id} ({theme.label})")
+    print(f"  ✓ Template: {template_path}")
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    prs = Presentation(args.template)
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    # テンプレートのプレースホルダー削除（中扉は専用デザイン）
+    # 中扉専用デザインのため、テンプレ placeholder を全削除して一から組む。
     remove_template_shapes(slide)
 
     # セクション番号と色を取得
@@ -164,12 +303,11 @@ def main():
     if color_hex:
         accent_color = hex_to_rgb(color_hex)
     else:
-        accent_color = SECTION_COLORS[(section_number - 1) % len(SECTION_COLORS)]
+        accent_color = _section_color(theme, section_number)
 
     # ── 左半分: 巨大なセクション番号 + アクセントカラー背景 ──
-    left_panel_w = Inches(5.50)
     left_bg = slide.shapes.add_shape(
-        MSO_SHAPE.RECTANGLE, Emu(0), Emu(0), left_panel_w, SLIDE_H,
+        MSO_SHAPE.RECTANGLE, Emu(0), Emu(0), LEFT_PANEL_W, SLIDE_H,
     )
     left_bg.fill.solid()
     left_bg.fill.fore_color.rgb = accent_color
@@ -179,7 +317,7 @@ def main():
 
     # 巨大な番号（中央）
     num_tb = slide.shapes.add_textbox(
-        Emu(0), Inches(1.5), left_panel_w, Inches(4.5),
+        Emu(0), NUM_TOP, LEFT_PANEL_W, NUM_H,
     )
     ntf = num_tb.text_frame
     ntf.margin_left = 0; ntf.margin_right = 0
@@ -198,7 +336,8 @@ def main():
         "sz": str(int(FONT_SIZE_BIG_NUMBER.pt * 100)),
         "b": "1",
     })
-    etree.SubElement(rPr, qn("a:latin"), attrib={"typeface": "Arial"})
+    etree.SubElement(rPr, qn("a:latin"), attrib={"typeface": FONT_NAME_LATIN})
+    etree.SubElement(rPr, qn("a:ea"), attrib={"typeface": FONT_NAME_JP})
     sf = etree.SubElement(rPr, qn("a:solidFill"))
     s = etree.SubElement(sf, qn("a:srgbClr"))
     s.set("val", "FFFFFF")
@@ -207,7 +346,7 @@ def main():
 
     # 番号上の小ラベル "SECTION"
     label_tb = slide.shapes.add_textbox(
-        Emu(0), Inches(2.6), left_panel_w, Inches(0.4),
+        Emu(0), LABEL_TOP, LEFT_PANEL_W, LABEL_H,
     )
     ltf = label_tb.text_frame
     ltf.margin_left = 0; ltf.margin_right = 0
@@ -216,40 +355,29 @@ def main():
     p_lbl.alignment = PP_ALIGN.CENTER
     r_lbl = p_lbl.add_run()
     r_lbl.text = "SECTION"
-    r_lbl.font.size = Pt(20)
+    r_lbl.font.size = FONT_SIZE_SECTION_LABEL
     r_lbl.font.bold = True
-    r_lbl.font.name = "Arial"
+    r_lbl.font.name = FONT_NAME_LATIN
     r_lbl.font.color.rgb = COLOR_WHITE
 
     # ── 右半分: タイトル・サブタイトル・トピック ──
-    right_x = left_panel_w + Inches(0.50)
-    right_w = SLIDE_W - right_x - Inches(0.50)
+    right_x = LEFT_PANEL_W + RIGHT_X_OFFSET
+    right_w = SLIDE_W - right_x - RIGHT_PAD_RIGHT
 
     # タイトル
     title = data.get("title", "セクションタイトル")
-    title_tb = slide.shapes.add_textbox(
-        right_x, Inches(2.30), right_w, Inches(1.20),
+    add_text_box(
+        slide, title,
+        right_x, TITLE_TOP, right_w, TITLE_H,
+        FONT_SIZE_SECTION_TITLE, bold=True,
+        color=COLOR_TEXT, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
     )
-    ttf = title_tb.text_frame
-    ttf.word_wrap = True
-    ttf.margin_left = 0; ttf.margin_right = 0
-    ttf.margin_top = 0; ttf.margin_bottom = 0
-    ttf.vertical_anchor = MSO_ANCHOR.TOP
-
-    p_t = ttf.paragraphs[0]
-    p_t.alignment = PP_ALIGN.LEFT
-    r_t = p_t.add_run()
-    r_t.text = title
-    r_t.font.size = FONT_SIZE_SECTION_TITLE
-    r_t.font.bold = True
-    r_t.font.name = FONT_NAME_JP
-    r_t.font.color.rgb = COLOR_TEXT
 
     # アクセントライン（タイトルの下）
     accent_line = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE,
-        right_x, Inches(3.35),
-        Inches(1.0), Emu(int(Inches(0.06))),
+        right_x, ACCENT_LINE_TOP,
+        ACCENT_LINE_W, ACCENT_LINE_H,
     )
     accent_line.fill.solid()
     accent_line.fill.fore_color.rgb = accent_color
@@ -258,28 +386,18 @@ def main():
     # サブタイトル
     subtitle = data.get("subtitle", "")
     if subtitle:
-        sub_tb = slide.shapes.add_textbox(
-            right_x, Inches(3.55), right_w, Inches(0.50),
+        add_text_box(
+            slide, subtitle,
+            right_x, SUBTITLE_TOP, right_w, SUBTITLE_H,
+            FONT_SIZE_SUBTITLE, bold=False,
+            color=COLOR_SUBTEXT, align=PP_ALIGN.LEFT,
         )
-        stf = sub_tb.text_frame
-        stf.word_wrap = True
-        stf.margin_left = 0; stf.margin_right = 0
-        stf.margin_top = 0; stf.margin_bottom = 0
-        p_s = stf.paragraphs[0]
-        p_s.alignment = PP_ALIGN.LEFT
-        r_s = p_s.add_run()
-        r_s.text = subtitle
-        r_s.font.size = FONT_SIZE_SUBTITLE
-        r_s.font.bold = False
-        r_s.font.name = FONT_NAME_JP
-        r_s.font.color.rgb = COLOR_SUBTEXT
 
     # トピックリスト
     topics = data.get("topics", [])
     if topics:
-        topics_y = Inches(4.30)
         topic_label_tb = slide.shapes.add_textbox(
-            right_x, topics_y, right_w, Inches(0.30),
+            right_x, TOPICS_TOP, right_w, TOPIC_LABEL_H,
         )
         tltf = topic_label_tb.text_frame
         tltf.margin_left = 0; tltf.margin_right = 0
@@ -288,15 +406,15 @@ def main():
         p_tl.alignment = PP_ALIGN.LEFT
         r_tl = p_tl.add_run()
         r_tl.text = "▍ このセクションで扱う内容"
-        r_tl.font.size = Pt(13)
+        r_tl.font.size = FONT_SIZE_TOPIC
         r_tl.font.bold = True
         r_tl.font.name = FONT_NAME_JP
         r_tl.font.color.rgb = accent_color
 
         # トピック項目
         topic_tb = slide.shapes.add_textbox(
-            right_x + Inches(0.10), topics_y + Inches(0.40),
-            right_w - Inches(0.10), Inches(2.0),
+            right_x + TOPIC_OFFSET, TOPICS_TOP + Inches(0.40),
+            right_w - TOPIC_OFFSET, TOPIC_H,
         )
         topic_tf = topic_tb.text_frame
         topic_tf.word_wrap = True
@@ -317,7 +435,8 @@ def main():
                 etree.SubElement(spcBef, qn("a:spcPts"), attrib={"val": "400"})
 
             buChar = etree.SubElement(pPr, qn("a:buChar"), attrib={"char": "▸"})
-            buFont = etree.SubElement(pPr, qn("a:buFont"), attrib={"typeface": "Arial"})
+            # bullet typeface: roleup でも Yu Gothic UI に揃える (C8 適用範囲は run のみだが念のため)
+            buFont = etree.SubElement(pPr, qn("a:buFont"), attrib={"typeface": FONT_NAME_JP})
             buClr = etree.SubElement(pPr, qn("a:buClr"))
             buClrSolid = etree.SubElement(buClr, qn("a:srgbClr"))
             buClrSolid.set("val", "{:02X}{:02X}{:02X}".format(accent_color[0], accent_color[1], accent_color[2]))
@@ -331,7 +450,7 @@ def main():
             etree.SubElement(rPr_top, qn("a:ea"), attrib={"typeface": FONT_NAME_JP})
             sf_top = etree.SubElement(rPr_top, qn("a:solidFill"))
             s_top = etree.SubElement(sf_top, qn("a:srgbClr"))
-            s_top.set("val", "333333")
+            s_top.set("val", "{:02X}{:02X}{:02X}".format(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2]))
             t_top = etree.SubElement(r_top, qn("a:t"))
             t_top.text = topic
 

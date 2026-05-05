@@ -1,0 +1,21 @@
+{
+  "_comment": "Roleup A4 横 (11.693×8.268 in). 左パネル幅は stella 比率 (5.50/13.33≈0.413) を維持。垂直方向は slide_h=8.27 に合わせ全体を下方シフト + 余裕を確保。",
+  "left_panel_w_in": 4.83,
+  "num_top_in": 1.80,
+  "num_h_in": 4.50,
+  "label_top_in": 2.90,
+  "label_h_in": 0.40,
+  "right_x_offset_in": 0.50,
+  "right_pad_right_in": 0.50,
+  "title_top_in": 2.60,
+  "title_h_in": 1.20,
+  "accent_line_top_in": 3.65,
+  "accent_line_w_in": 1.00,
+  "accent_line_h_in": 0.06,
+  "subtitle_top_in": 3.85,
+  "subtitle_h_in": 0.50,
+  "topics_top_in": 4.60,
+  "topic_label_h_in": 0.30,
+  "topic_offset_in": 0.10,
+  "topic_h_in": 2.50
+}

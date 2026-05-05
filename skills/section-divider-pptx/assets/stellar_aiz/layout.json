@@ -1,0 +1,21 @@
+{
+  "_comment": "Stella 16:9 (13.33×7.50 in). Mirrors V1 hardcoded values in fill_section_divider.py for regression-zero.",
+  "left_panel_w_in": 5.50,
+  "num_top_in": 1.50,
+  "num_h_in": 4.50,
+  "label_top_in": 2.60,
+  "label_h_in": 0.40,
+  "right_x_offset_in": 0.50,
+  "right_pad_right_in": 0.50,
+  "title_top_in": 2.30,
+  "title_h_in": 1.20,
+  "accent_line_top_in": 3.35,
+  "accent_line_w_in": 1.00,
+  "accent_line_h_in": 0.06,
+  "subtitle_top_in": 3.55,
+  "subtitle_h_in": 0.50,
+  "topics_top_in": 4.30,
+  "topic_label_h_in": 0.30,
+  "topic_offset_in": 0.10,
+  "topic_h_in": 2.00
+}
