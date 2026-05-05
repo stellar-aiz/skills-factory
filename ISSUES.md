@@ -547,6 +547,7 @@ V2 で各スキルに A4 横（11.69×8.27）+ Yu Gothic UI + 褐色アクセン
 - ✅ **(ii) 共通プロンプトのコピペ展開** — agent 7 件（market-overview / strategy-report / company-deepdive / business-deepdive / smallcap-strategy-research / bdd-init / comparison-synthesis-agent）の Step 0 に `step0_brand_clarification.md` の sync コメント + 短縮抜粋（AskUserQuestion 擬似コード + scope 保存仕様）を埋め込み（commit `42e5377`、grep で 7 件全 hit）
 - ✅ **(iii) orchestrator に warning fallback 実装** — `_common/lib/orchestrator_helpers.py` に `resolve_fill_brand_with_warning()` / `append_brand_warnings_to_merge_file()` を新設し pytest 10 ケース全 pass（commit `c07ac24`）。bdd-init を除く 6 agent の fill 起動ループに warning fallback 擬似コード差し込み（commit `a70304a`）。warning 蓄積先は `merge_warnings.json` 流用（orchestrator が merge 後に append、merge-pptxv2 の `"w"` 上書きとの干渉を回避）
 - ✅ **(iv) E2E 1 本** — market-overview-agent × `--brand roleup` 疎通確認完了（2026-05-05）
+- ✅ **(v) Phase 1.5 — 42 非 pilot fill に passive `--brand` 導入** — Phase 1 (iv) で炙り出した「非 pilot fill が `--brand` を argparse 拒否」問題を mechanical に解消（2026-05-05、commit `28ed496`、smallcap-* 5 件除外）
 
 ### Phase 1 (ii)+(iii) 完了内容（2026-05-05）
 
@@ -597,12 +598,36 @@ V2 で各スキルに A4 横（11.69×8.27）+ Yu Gothic UI + 褐色アクセン
 2. **テンプレートパス命名の不統一**: `table-of-contents-pptx-template.pptx` / `section-divider-pptx-template.pptx` は `<skill_name>-template.pptx` 慣習から外れる（"-pptx-template" になっている）。`market-kbf-pptx` の fill script 名も `fill_kbf.py`(他は `fill_<skill_id>.py`)。orchestrator 側に explicit override が必要。Phase 2 で命名を揃えるか、orchestrator helper にマッピング dict を追加するかの判断を要する。
 3. **pilot 3 の roleup データバリデーション**: `market-environment` は roleup の `fiscal_period_format()` が ON のとき `int(d["year"])` を要求するため、`"2025E"`/`"2026E"` 等の estimated suffix 入りデータは ValueError で落ちる。Phase 2 では fill 内で suffix を strip するか、データ生成側（subagent prompt）に整数化を強制するかの判断を要する。今 E2E では手動で suffix を除去して回避。
 
+### Phase 1 (v) — Phase 1.5 完了内容（2026-05-05、commit `28ed496`）
+
+**実装内容**: AST migration helper（`tools/add_passive_brand_arg.py`、commit には含めず使い捨て）で 42 非 pilot fill に以下 6 行を mechanical に挿入:
+
+```python
+# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
+from brand_resolver import add_brand_arg  # noqa: E402
+
+# in main() before parser.parse_args():
+add_brand_arg(<parser_var>)  # passive: accepted but ignored until brand migration
+```
+
+**スコープ**: 42 fill（smallcap-* 5 件は ISSUE-011 retrospective に従い除外）
+
+**検証結果**:
+- pytest 49 件全 pass（regression-zero）
+- pilot 3 × roleup で `check_brand_compliance.py` 28/28 PASS（Pilot 3 出力に変化なし）
+- Phase 1 (iv) E2E driver から `fill_supports_brand_flag` 条件分岐削除 + 全 fill に `--brand` 無条件付与 → 12/12 完走、warning 11 件
+- 5 重点 fill（exec-summary / market-share / positioning-map / competitor-summary / data-availability）の `--brand roleup` smoke test 全完走
+
+**意義**: Phase 2 以降、orchestrator は SKILL.md 擬似コード通りに `--brand` を fill に無条件付与すれば動作する。Phase 2 で個別に brand-aware 化する際は、`add_brand_arg` の呼び出しは既に置いてあるので、`args.brand` を `resolve_brand` に渡すだけで完成。
+
 ### Phase 2 着手点（次セッション以降）
 
-1. **Phase 1 (iv) 整備課題対応**:
-   - 全 fill に `add_brand_arg` を passive 導入（`--brand` 受領するが利用しない）— 30 分 × 25 fill ≒ 12h、または orchestrator 側で `fill_supports_brand_flag` を helper 化（より軽量）
-   - SKILL.md 擬似コードの `--brand` 付与を条件付き化（注記またはコード変更）
-2. **BDD 系 fill 14 件の brand-aware 化** を Pattern A/B/C で順次。優先順: executive-summary → revenue-analysis → data-availability → financial-benchmark → company-overview-pptx-v2。
-3. **市場系 fill 5 件**（market-share / positioning-map / competitor-summary / market-kbf / pest-analysis）の brand-aware 化（market-overview-agent × roleup の完全 native 化に必要）。
+1. **BDD 系 fill 14 件の brand-aware 化** を Pattern A/B/C で順次。優先順: executive-summary → revenue-analysis → data-availability → financial-benchmark → company-overview-pptx-v2。各 fill は既に `add_brand_arg(parser)` を呼んでいるので、`args.brand` を読み出して `resolve_brand` で theme を取り、Pattern A (hardcode 駆動) / Pattern B (rPr/tcPr 駆動) / Pattern C (HTML 駆動) で brand 別出力を実装。
+2. **市場系 fill 5 件**（market-share / positioning-map / competitor-summary / market-kbf / pest-analysis）の brand-aware 化（market-overview-agent × roleup の完全 native 化に必要）。
+3. **Phase 1 (iv) 残り課題**:
+   - 項目 2: テンプレート/script 命名不統一（toc/section-divider/market-kbf）→ Phase 2 着手時に整理
+   - 項目 3: pilot 3 (market-environment) × roleup の year suffix（"2025E"）→ Phase 2 でデータ生成側で integer 化を強制するか fill 側で strip するか決める
 
-**Phase 2（5-10 セッション）の前提**: Phase 1 (iv) E2E で wiring 自体は健全と確認済。fallback flow が運用可能なので、急いで brand-aware 化しなくても roleup ユーザーには「pilot 3 のみ roleup、他は stella で fallback」が透明性高く伝わる状態。
+**Phase 2（5-10 セッション）の前提**: Phase 1 (iv) E2E で wiring 自体は健全と確認済 + Phase 1.5 で fallback flow が SKILL.md 擬似コードのまま本番動作可能になった。fallback で運用可能なので、急いで brand-aware 化しなくても roleup ユーザーには「pilot 3 のみ roleup、他は stella で fallback」が透明性高く伝わる状態。
