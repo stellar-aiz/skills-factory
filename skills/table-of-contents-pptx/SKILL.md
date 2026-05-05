@@ -11,7 +11,7 @@ description: >
   - 「セクション一覧」「章立て」「構成スライド」という要望
   - 企業調査レポート・デッキの冒頭目次スライド作成
   - 「ページ番号付きの目次」「サブ項目付き目次」を求められた場合
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -109,9 +109,13 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_table_of_contents.py \
   --data {{WORK_DIR}}/toc_data.json \
-  --template <SKILL_DIR>/assets/table-of-contents-template.pptx \
+  --brand stellar_aiz \
   --output {{OUTPUT_DIR}}/TableOfContents_output.pptx
 ```
+
+`--brand` は `stellar_aiz`（既定、16:9 / Meiryo UI / 28-18-11pt / 7 色ローテ）か
+`roleup`（A4 横 / Yu Gothic UI / 22-14-10pt / theme.chart_palette 8 色ローテ）を指定。
+`--template` を省略すると brand に応じたテンプレートが自動解決される。
 
 ---
 
@@ -128,8 +132,11 @@ python <SKILL_DIR>/scripts/fill_table_of_contents.py \
 
 | ファイル | 用途 |
 |---|---|
-| `assets/table-of-contents-template.pptx` | スライドテンプレート |
-| `scripts/fill_table_of_contents.py` | 生成スクリプト |
+| `assets/stellar_aiz/table-of-contents-template.pptx` | スライドテンプレート (stellar_aiz, 16:9) |
+| `assets/stellar_aiz/layout.json` | stellar_aiz レイアウト座標 (V1 hardcode 値ミラー) |
+| `assets/roleup/table-of-contents-template.pptx` | スライドテンプレート (roleup, A4 横) |
+| `assets/roleup/layout.json` | roleup レイアウト座標 (slide_w 11.69 in に合わせ TOC 幅 10.09 に再計算) |
+| `scripts/fill_table_of_contents.py` | 生成スクリプト (Pattern A: brand-aware) |
 | `references/sample_data.json` | サンプル（6セクション構成） |
 
 ---

@@ -1,0 +1,14 @@
+{
+  "_comment": "Roleup A4 横 (11.693×8.268 in). 左右 0.80 余白で TOC 幅 10.09 in。Source は cp roleup から流用 (0.41, 7.57, 10.88, 0.44)。",
+  "toc_left_in": 0.80,
+  "toc_top_in": 1.55,
+  "toc_width_in": 10.09,
+  "toc_height_in": 5.85,
+  "source_x_in": 0.41,
+  "source_y_in": 7.57,
+  "source_w_in": 10.88,
+  "source_h_in": 0.44,
+  "badge_w_in": 0.75,
+  "badge_offset_in": 0.18,
+  "page_w_in": 0.80
+}

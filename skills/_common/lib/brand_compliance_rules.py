@@ -544,9 +544,10 @@ PROFILES: dict[tuple, list[Callable]] = {
         rule_no_guide_rectangles, rule_slide_size, rule_font_name,
     ],
     ("table-of-contents-pptx", "roleup"): [
-        # TOC はチャート不在のため C10/C12 を除外。残り 8 ルール適用。
+        # TOC はチャート不在 (C10/C12 除外) かつ出典任意 (C6 除外)。
+        # 残り 7 ルール (C1/C2/C4/C5/C7/C8/C11) を適用。
         r for r in _COMMON_ROLEUP_RULES
-        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
+        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend, rule_source_required)
     ],
     ("data-availability-pptx", "roleup"): [
         # data-availability はテーブル+textbox 構成、チャート不在のため C10/C12 を除外。

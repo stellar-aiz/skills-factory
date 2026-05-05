@@ -1,0 +1,14 @@
+{
+  "_comment": "Stella 16:9 (13.33×7.50 in). Mirrors V1 hardcoded values in fill_table_of_contents.py for regression-zero.",
+  "toc_left_in": 0.80,
+  "toc_top_in": 1.55,
+  "toc_width_in": 11.73,
+  "toc_height_in": 5.40,
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 12.50,
+  "source_h_in": 0.25,
+  "badge_w_in": 0.85,
+  "badge_offset_in": 0.20,
+  "page_w_in": 0.80
+}
