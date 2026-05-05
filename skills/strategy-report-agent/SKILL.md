@@ -529,7 +529,39 @@ Five Forces
 
 中扉を生成するタイミングは任意だが、**ファイル名の番号は必ずセクションの最初のコンテンツスライドの直前の番号にすること**。
 
+### スライド生成開始前: brand fallback バッファ初期化（必須）
+
+Step 0.0-pre で確定した `scope.brand` を使い、未対応 fill 検出用の warning バッファを初期化する。各 fill 起動前に `resolve_fill_brand_with_warning()` を呼び、未対応スキルでは `stellar_aiz` に fallback + warning を buffer に蓄積する（`skills/_common/lib/orchestrator_helpers.py` 参照）。
+
+```python
+import os, sys, subprocess
+sys.path.insert(0, os.path.join("{{SKILL_DIR}}", "..", "_common", "lib"))
+from orchestrator_helpers import (
+    resolve_fill_brand_with_warning,
+    append_brand_warnings_to_merge_file,
+)
+
+scope_brand = "stellar_aiz"  # Step 0.0-pre で確定した値（会話メモリから）
+brand_warnings: list = []
+```
+
 ### 共通パターン
+
+各 fill 起動前に `resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)` で fill に渡す brand を確定する。supported なら `scope_brand` がそのまま、未対応なら `stellar_aiz` が返り `brand_warnings` に `brand_fallback` エントリが追記される。
+
+```python
+skill_dir = "<SKILL_DIR>"
+fill_brand = resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)
+subprocess.run([
+    "python", os.path.join(skill_dir, "scripts", "fill_[skill].py"),
+    "--brand", fill_brand,
+    "--data", "{{WORK_DIR}}/[skill]_data.json",
+    "--template", os.path.join(skill_dir, "assets", "[skill]-template.pptx"),
+    "--output", "{{WORK_DIR}}/slide_NN_[name].pptx",
+], check=True)
+```
+
+bash で直接書く場合（既存スキル踏襲、warning fallback は使わない場合）:
 
 ```bash
 pip install python-pptx -q --break-system-packages
@@ -539,6 +571,7 @@ cat > {{WORK_DIR}}/[skill]_data.json <<'EOF'
 EOF
 
 python <SKILL_DIR>/scripts/fill_[skill].py \
+  --brand stellar_aiz \
   --data {{WORK_DIR}}/[skill]_data.json \
   --template <SKILL_DIR>/assets/[skill]-template.pptx \
   --output {{WORK_DIR}}/slide_NN_[name].pptx
@@ -719,6 +752,18 @@ python <merge-pptxv2_DIR>/scripts/merge_pptx_v2.py \
 ```
 
 出力ファイル名: `StrategyReport_[対象会社名].pptx`
+
+### merge 完了後: brand_warnings を merge_warnings.json に追記（必須）
+
+merge-pptxv2 は `merge_warnings.json` を `"w"` モードで上書きするため、Step 5（共通パターン）中に蓄積した `brand_warnings` は merge 完了後にここで追記する。
+
+```python
+append_brand_warnings_to_merge_file(
+    "{{OUTPUT_DIR}}/merge_warnings.json", brand_warnings,
+)
+# brand_warnings が空なら no-op（既存ファイルは触らない）。
+# 末尾の最終ユーザー伝達でも warning 件数 + 内訳を必ず提示する。
+```
 
 ### マージ後の最終検証
 

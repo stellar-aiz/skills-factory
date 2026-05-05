@@ -542,12 +542,47 @@ parsed = parse_subagent_return(result)
 
 strategy-report-agent v5.1 の規約と同じ。番号と最終並び順を一致させる。
 
+### Step 5 開始前: brand fallback バッファ初期化（必須）
+
+scope.json から brand を読み出し、未対応 fill 検出用の warning バッファを初期化する。各 fill 起動前に `resolve_fill_brand_with_warning()` を呼び、未対応スキルでは `stellar_aiz` に fallback + warning を buffer に蓄積する（`skills/_common/lib/orchestrator_helpers.py` 参照）。
+
+```python
+import json, os, sys, subprocess
+sys.path.insert(0, os.path.join("{{SKILL_DIR}}", "..", "_common", "lib"))
+from orchestrator_helpers import (
+    resolve_fill_brand_with_warning,
+    append_brand_warnings_to_merge_file,
+)
+
+with open("{{WORK_DIR}}/<run_id>/scope.json", encoding="utf-8") as f:
+    scope = json.load(f)
+scope_brand = scope.get("brand", "stellar_aiz")
+brand_warnings: list = []  # Step 7 後に merge_warnings.json へ append する
+```
+
 ### 共通実行パターン
+
+各 fill 起動前に `resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)` で fill に渡す brand を確定する。supported なら `scope_brand` がそのまま、未対応なら `stellar_aiz` が返り `brand_warnings` に `brand_fallback` エントリが追記される。
+
+```python
+skill_dir = os.path.join("{{SKILL_DIR}}", "<dependency_skill>")
+fill_brand = resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)
+subprocess.run([
+    "python", os.path.join(skill_dir, "scripts", "fill_<name>.py"),
+    "--brand", fill_brand,
+    "--data", "{{WORK_DIR}}/<run_id>/data_NN_<name>.json",
+    "--template", os.path.join(skill_dir, "assets", "<template>.pptx"),
+    "--output", "{{WORK_DIR}}/<run_id>/slide_NN_<name>.pptx",
+], check=True)
+```
+
+bash で直接書く場合（既存スキル踏襲、warning fallback は使わない場合）:
 
 ```bash
 pip install python-pptx -q --break-system-packages
 
 python {{SKILL_DIR}}/<dependency_skill>/scripts/fill_<name>.py \
+  --brand "$(jq -r '.brand // "stellar_aiz"' {{WORK_DIR}}/<run_id>/scope.json)" \
   --data {{WORK_DIR}}/<run_id>/data_NN_<name>.json \
   --template {{SKILL_DIR}}/<dependency_skill>/assets/<template>.pptx \
   --output {{WORK_DIR}}/<run_id>/slide_NN_<name>.pptx
@@ -697,6 +732,18 @@ python {{SKILL_DIR}}/merge-pptxv2/scripts/merge_pptx_v2.py \
 `<market_name>` はスネークケース化（例: `HRTech`）、`<date>` は実行日（YYYY-MM-DD）。
 `--merge-order` を指定すると `section_divider` 位置検証が走り、結果は出力 PPTX と同じ
 ディレクトリの `merge_warnings.json` に保存される（違反ゼロでも空配列で出力される）。
+
+### merge 完了後: brand_warnings を merge_warnings.json に追記（必須）
+
+merge-pptxv2 は `merge_warnings.json` を `"w"` モードで上書きするため、Step 5 中に蓄積した `brand_warnings` は merge 完了後にここで追記する。
+
+```python
+append_brand_warnings_to_merge_file(
+    "{{OUTPUT_DIR}}/merge_warnings.json", brand_warnings,
+)
+# brand_warnings が空なら no-op（既存ファイルは触らない）。
+# 末尾の Step 8（残存 issue 判断）でユーザーに warning 件数 + 内訳を提示すること。
+```
 
 ### マージ後の最終検証
 

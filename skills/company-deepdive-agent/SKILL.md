@@ -278,7 +278,31 @@ parsed = parse_subagent_return(result)
 
 **進捗**: 開始時 `TaskCreate(subject="company-deepdive: Step 5 - 会社レベル PPTX 生成 (8 枚)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。本 Step 中は `validate_pptx_after_fill.py` hook が各 fill_*.py 実行後に PPTX 整合性を自動検証する。
 
-各論点を対応 PPTX スキル（上記マッピング）の `fill_*.py` で生成。
+#### Step 5 開始前: brand fallback バッファ初期化（必須）
+
+scope.json から brand を読み出し、未対応 fill 検出用の warning バッファを初期化する。各 fill 起動前に `resolve_fill_brand_with_warning()` を呼び、未対応スキルでは `stellar_aiz` に fallback + warning を buffer に蓄積する（`skills/_common/lib/orchestrator_helpers.py` 参照）。
+
+```python
+import json, os, sys, subprocess
+sys.path.insert(0, os.path.join("{{SKILL_DIR}}", "..", "_common", "lib"))
+from orchestrator_helpers import (
+    resolve_fill_brand_with_warning,
+    append_brand_warnings_to_merge_file,
+)
+
+with open("{{WORK_DIR}}/company-deepdive-agent/<run_id>/scope.json", encoding="utf-8") as f:
+    scope = json.load(f)
+scope_brand = scope.get("brand", "stellar_aiz")
+brand_warnings: list = []  # Step 8 後に merge_warnings.json へ append する
+
+# 各 fill 起動例:
+# skill_dir = os.path.join("{{SKILL_DIR}}", "executive-summary-pptx")
+# fill_brand = resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)
+# subprocess.run(["python", os.path.join(skill_dir, "scripts", "fill_executive_summary.py"),
+#                 "--brand", fill_brand, "--data", "...", "--output", "..."], check=True)
+```
+
+各論点を対応 PPTX スキル（上記マッピング）の `fill_*.py` で生成。すべての起動で `--brand <fill_brand>` を渡す。
 
 | Slide | スキル | data ファイル | output ファイル |
 |---|---|---|---|
@@ -407,6 +431,18 @@ python3 ~/.claude/skills/merge-pptxv2/scripts/merge_pptx_v2.py \
 ```
 
 完了後、`{{OUTPUT_DIR}}/<run_id>/merge_warnings.json` を確認（`section_divider_position` 違反 0 件であること）。
+
+#### Step 8 後: brand_warnings を merge_warnings.json に追記（必須）
+
+merge-pptxv2 は `merge_warnings.json` を `"w"` モードで上書きするため、Step 5/6 中に蓄積した `brand_warnings`（および business-deepdive-agent の子オーケストレータが返した brand_warnings 群）は merge 完了後にここでまとめて追記する。
+
+```python
+append_brand_warnings_to_merge_file(
+    "{{OUTPUT_DIR}}/<run_id>/merge_warnings.json", brand_warnings,
+)
+# brand_warnings が空なら no-op（既存ファイルは触らない）。
+# Step 10 等の最終ユーザー伝達でも warning 件数 + 内訳を提示する。
+```
 
 ### Step 9: visual-quality-reviewer + 自動修正ループ（最大 2 ラウンド）
 

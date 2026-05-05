@@ -306,35 +306,59 @@ parsed = parse_subagent_return(result)
 
 **進捗**: 開始時 `TaskCreate(subject="business-deepdive: Step 4 - PPTX 生成 (5枚)")` → 完了時 `TaskUpdate(completed)` + `task_state.json` 更新。本 Step 中は `validate_pptx_after_fill.py` hook が各 fill_*.py 実行後に PPTX 整合性を自動検証する（壊れていれば exit 2 で停止）。
 
-承認後、5 つの PPTX を生成:
+#### Step 4 開始前: brand fallback バッファ初期化（必須）
+
+Step 0 で受領した（または単独起動時に確定した）`brand` を使い、5 つの fill 起動それぞれで `resolve_fill_brand_with_warning()` を呼ぶ。**本スキルは merge を実施しない**ため、`brand_warnings` は `segment_summary.json` に含めて親（company-deepdive-agent）に返却し、親が merge 完了後に `merge_warnings.json` へ追記する責務を持つ。
+
+```python
+import os, sys, subprocess
+sys.path.insert(0, os.path.join("{{SKILL_DIR}}", "..", "_common", "lib"))
+from orchestrator_helpers import resolve_fill_brand_with_warning
+
+scope_brand = "stellar_aiz"  # Step 0 で受領した brand（既定 stellar_aiz）
+brand_warnings: list = []
+
+# 5 fill それぞれに対して同じパターン:
+# skill_dir = os.path.join("{{SKILL_DIR}}", "<skill-name>-pptx")
+# fill_brand = resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)
+# subprocess.run(["python", os.path.join(skill_dir, "scripts", "fill_<name>.py"),
+#                 "--brand", fill_brand, "--data", "...", "--output", "..."], check=True)
+```
+
+承認後、5 つの PPTX を生成（すべての起動で `--brand <fill_brand>` を渡す）:
 
 ```bash
 # 1. 事業の概要
 python ~/.claude/skills/business-overview-pptx/scripts/fill_business_overview.py \
+  --brand stellar_aiz \
   --data <work_dir>/data_<NN>_business_overview.json \
   --template ~/.claude/skills/business-overview-pptx/assets/business-overview-template.pptx \
   --output <work_dir>/slide_<NN>_business_overview.pptx
 
 # 2. ビジネスモデル
 python ~/.claude/skills/business-model-pptx/scripts/fill_business_model.py \
+  --brand stellar_aiz \
   --data <work_dir>/data_<NN+1>_business_model.json \
   --template ~/.claude/skills/business-model-pptx/assets/business-model-template.pptx \
   --output <work_dir>/slide_<NN+1>_business_model.pptx
 
 # 3. 差別化（バリューチェーン上のポジション）
 python ~/.claude/skills/value-chain-matrix-pptx/scripts/fill_value_chain_matrix.py \
+  --brand stellar_aiz \
   --data <work_dir>/data_<NN+2>_value_chain_matrix.json \
   --template ~/.claude/skills/value-chain-matrix-pptx/assets/value-chain-matrix-template.pptx \
   --output <work_dir>/slide_<NN+2>_value_chain_matrix.pptx
 
 # 4. 主要顧客プロファイル
 python ~/.claude/skills/customer-profile-pptx/scripts/fill_customer_profile.py \
+  --brand stellar_aiz \
   --data <work_dir>/data_<NN+3>_customer_profile.json \
   --template ~/.claude/skills/customer-profile-pptx/assets/customer-profile-template.pptx \
   --output <work_dir>/slide_<NN+3>_customer_profile.pptx
 
 # 5. 顧客市場の成長性
 python ~/.claude/skills/market-environment-pptx/scripts/fill_market_environment.py \
+  --brand stellar_aiz \
   --data <work_dir>/data_<NN+4>_market_environment.json \
   --template ~/.claude/skills/market-environment-pptx/assets/market-environment-template.pptx \
   --output <work_dir>/slide_<NN+4>_market_environment.pptx
@@ -373,11 +397,15 @@ python ~/.claude/skills/market-environment-pptx/scripts/fill_market_environment.
   "data_gaps": [
     "セグメント別営業利益率の詳細内訳",
     "..."
-  ]
+  ],
+  "brand": "stellar_aiz",
+  "brand_warnings": []
 }
 ```
 
 `open_questions` は親 `comparison-synthesis-agent` で全社統合の検証論点に集約される。
+
+`brand` は Step 0 で受領した値をそのまま転記。`brand_warnings` は Step 4 で蓄積した未対応 fill 検出ログ（空配列なら 0 件）。**親 `company-deepdive-agent` は本セグメントの `brand_warnings` を全セグメント分まとめて受け取り、merge 完了後に `merge_warnings.json` へ追記する責務を持つ**。子側（本スキル）は `merge_warnings.json` を直接書かない。
 
 ### Step 6: 終了
 

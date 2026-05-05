@@ -150,7 +150,29 @@ for brand_id in discovered:
 
 ### Step 3: 比較スライド生成
 
-各論点に応じて既存 PPTX スキルを呼び出し:
+#### Step 3 開始前: brand fallback バッファ初期化（必須）
+
+Step 0 で確定した `scope_brand` を使い、未対応 fill 検出用の warning バッファを初期化する。各 fill 起動前に `resolve_fill_brand_with_warning()` を呼び、未対応スキルでは `stellar_aiz` に fallback + warning を buffer に蓄積する（`skills/_common/lib/orchestrator_helpers.py` 参照）。
+
+```python
+import os, sys, subprocess
+sys.path.insert(0, os.path.join("{{SKILL_DIR}}", "..", "_common", "lib"))
+from orchestrator_helpers import (
+    resolve_fill_brand_with_warning,
+    append_brand_warnings_to_merge_file,
+)
+
+scope_brand = "stellar_aiz"  # Step 0 で確定した値（会話メモリから）
+brand_warnings: list = []  # Step 5 (merge) 後に merge_warnings.json へ append する
+
+# 各 fill 起動例:
+# skill_dir = os.path.join("{{SKILL_DIR}}", "competitor-summary-pptx")
+# fill_brand = resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)
+# subprocess.run(["python", os.path.join(skill_dir, "scripts", "fill_competitor_summary.py"),
+#                 "--brand", fill_brand, "--data", "...", "--output", "..."], check=True)
+```
+
+各論点に応じて既存 PPTX スキルを呼び出し（すべての起動で `--brand <fill_brand>` を渡す）:
 
 | スライド | スキル |
 |---|---|
@@ -175,6 +197,18 @@ for brand_id in discovered:
 会社レベル比較 + 事業セグメント別比較 + 検証論点 + データアベイラビリティを結合。
 
 `outputs/Comparison_<業界>_<date>.pptx` に保存。
+
+#### merge 完了後: brand_warnings を merge_warnings.json に追記（必須）
+
+merge-pptxv2 は `merge_warnings.json` を `"w"` モードで上書きするため、Step 3 中に蓄積した `brand_warnings` は merge 完了後にここで追記する。
+
+```python
+append_brand_warnings_to_merge_file(
+    "outputs/Comparison_<業界>_<date>/merge_warnings.json", brand_warnings,
+)
+# brand_warnings が空なら no-op（既存ファイルは触らない）。
+# Step 7（ユーザーへ提示）でも warning 件数 + 内訳を必ず提示する。
+```
 
 ### Step 6: visual-quality-reviewer + 自動修正ループ
 

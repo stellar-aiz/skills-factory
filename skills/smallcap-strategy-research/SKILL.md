@@ -405,7 +405,33 @@ for key in ["table_of_contents","executive_summary","company_overview","company_
 
 #### Step 6.5.2: 各PPTXスキルを呼び出す（7スライド生成）
 
-**ファイル番号 = 最終デッキ位置** のルールを厳守する。`strategy_hypothesis` は `pyramid-structure-pptx`、`reality_check` は `issue-risk-list-pptx`（2枚目の使用）を呼び出す:
+**ファイル番号 = 最終デッキ位置** のルールを厳守する。`strategy_hypothesis` は `pyramid-structure-pptx`、`reality_check` は `issue-risk-list-pptx`（2枚目の使用）を呼び出す。
+
+##### Step 6.5.2 開始前: brand fallback バッファ初期化（必須）
+
+`master_output.json.brand`（Step 0.0-pre で確定）を使い、未対応 fill 検出用の warning バッファを初期化する。各 fill 起動前に `resolve_fill_brand_with_warning()` を呼び、未対応スキルでは `stellar_aiz` に fallback + warning を buffer に蓄積する（`skills/_common/lib/orchestrator_helpers.py` 参照）。
+
+```python
+import json, os, sys, subprocess
+sys.path.insert(0, os.path.join("{{SKILL_DIR}}", "..", "_common", "lib"))
+from orchestrator_helpers import (
+    resolve_fill_brand_with_warning,
+    append_brand_warnings_to_merge_file,
+)
+
+with open("{{WORK_DIR}}/master_output.json", encoding="utf-8") as f:
+    master = json.load(f)
+scope_brand = master.get("brand", "stellar_aiz")
+brand_warnings: list = []  # Step 6.5.3 (merge) 後に merge_warnings.json へ append する
+
+# 各 fill 起動例:
+# skill_dir = os.path.join(os.path.expanduser("~/.claude/skills/executive-summary-pptx"))
+# fill_brand = resolve_fill_brand_with_warning(skill_dir, scope_brand, brand_warnings)
+# subprocess.run(["python3", os.path.join(skill_dir, "scripts", "fill_executive_summary.py"),
+#                 "--brand", fill_brand, "--data", "...", "--output", "..."], check=True)
+```
+
+下記の bash 例も同様に `--brand <fill_brand>` を渡す形で起動すること（または上記 Python パターンに置き換える）:
 
 ```bash
 # スライド1: Executive Summary
@@ -534,6 +560,18 @@ python3 ~/.claude/skills/merge-pptxv2/scripts/merge_pptx_v2.py \
 ```
 
 **マージ順＝最終デッキ順**。引数順で「exec → toc → company → history → revenue → shareholder → swot → strategy_summary → **where(3p) → how(3p) → capability(3p) → aspiration(3p)** → reality → data → issue」。Issue/Risk List は行数が多い場合 auto-paginate するため、最終デッキは **23〜25 スライド**（4 次元 × 3 ページ展開）。
+
+##### merge 完了後: brand_warnings を merge_warnings.json に追記（必須）
+
+merge-pptxv2 は `merge_warnings.json` を `"w"` モードで上書きするため、Step 6.5.2 中に蓄積した `brand_warnings` は merge 完了後にここで追記する。
+
+```python
+append_brand_warnings_to_merge_file(
+    "{{OUTPUT_DIR}}/merge_warnings.json", brand_warnings,
+)
+# brand_warnings が空なら no-op（既存ファイルは触らない）。
+# Step 7（ユーザー提示）でも warning 件数 + 内訳を必ず提示する。
+```
 
 #### Phase 3.2b の PPTX スコープと今後
 
