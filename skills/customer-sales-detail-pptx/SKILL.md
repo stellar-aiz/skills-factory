@@ -15,7 +15,7 @@ description: >
   - BDD（ビジネスDD）の文脈で主要販売先の売上＋企業プロファイルを1枚のテーブルスライドにしたいという要望
   - ユーザーが顧客別売上のExcelファイルをアップロードし、各顧客の企業情報（事業内容・本社・上場・業績）も含めたスライド化を求めた場合
   - 「完成工事売上高と割合」に加えて「事業内容」「本社所在地」「直近期売上高」「利益」「利益率」を含むテーブルスライドを求められた場合
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -232,9 +232,12 @@ playwright install chromium 2>/dev/null
 
 python <SKILL_DIR>/scripts/fill_customer_sales_detail.py \
   --data {{WORK_DIR}}/customer_sales_detail_data.json \
-  --template <SKILL_DIR>/assets/customer-sales-detail-template.pptx \
-  --output {{OUTPUT_DIR}}/CustomerSalesDetail_output.pptx
+  --output {{OUTPUT_DIR}}/CustomerSalesDetail_output.pptx \
+  --brand stellar_aiz
 ```
+
+`--brand roleup` を渡すと A4 横 + Yu Gothic UI + 茶系のテンプレ・配色で生成される。
+`--template` は任意 (省略時は brand 別 curated テンプレを自動解決)。
 
 ※ `<SKILL_DIR>` は実際のスキルインストールパスに置き換えること。
 
@@ -307,13 +310,17 @@ python -m markitdown {{OUTPUT_DIR}}/CustomerSalesDetail_output.pptx
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/customer-sales-detail-template.pptx` | スライドテンプレート（sales-by-customer-templateベース） |
+| `assets/stellar_aiz/customer-sales-detail-template.pptx` | stella (16:9, Meiryo UI) 用テンプレート |
+| `assets/stellar_aiz/layout.json` | stella 用座標 |
+| `assets/roleup/customer-sales-detail-template.pptx` | roleup (A4 横, Yu Gothic UI, 茶系) 用 curated テンプレート |
+| `assets/roleup/layout.json` | roleup 用座標 |
 
 ## スクリプト
 
 | ファイル名 | 用途 |
 |---|---|
-| `scripts/fill_customer_sales_detail.py` | JSONデータからHTML描画→スクリーンショット→PPTXに挿入するスクリプト |
+| `scripts/fill_customer_sales_detail.py` | JSONデータからHTML描画→スクリーンショット→PPTXに挿入するスクリプト。`--brand` で stella / roleup を切替 |
+| `scripts/build_roleup_template.py` | one-shot generator: stella テンプレから roleup curated テンプレを派生生成。テンプレ更新時のみ手動実行 |
 
 ## 参考
 
