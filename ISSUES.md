@@ -643,6 +643,10 @@ add_brand_arg(<parser_var>)  # passive: accepted but ignored until brand migrati
 | 7 | `sga-breakdown-pptx` | ✅ 完了 | A (複合チャート + secondary axis line + trend arrow) | `b3ac7e8`(2026-05-06) |
 | 8 | `cost-breakdown-pptx` | ✅ 完了 | A (1〜2チャートモード) | `acb4dfe`(2026-05-06) |
 | 9 | `workforce-composition-pptx` | ✅ 完了 | A (棒チャート + テーブル) | `dff331f`(2026-05-06) |
+| 10 | `business-overview-pptx` | ✅ 完了 | A (revenue_chart + kpi_cards 両モード) | `928a6f3`(2026-05-06) |
+| 11 | `sales-by-customer-pptx` | ✅ 完了 | A (テーブル N 個横並び、期数別動的フォント vs roleup 固定 10pt) | (next commit)(2026-05-06) |
+| 12 | `valuation-summary-pptx` | ✅ 完了 | A (3 chart_type: football_field / equity_bridge / financial_summary) | (next commit)(2026-05-06) |
+| 13 | `scenario-forecast-pptx` | ✅ 完了 | A (Base/Up/Down 折れ線 ×2 並列、シリーズ + 期間種別凡例) | (next commit)(2026-05-06) |
 
 ### market-overview-agent × roleup フルネイティブ達成（2026-05-05）
 
@@ -697,13 +701,13 @@ roleup ネイティブで生成可能に。
 2. ~~**市場系 fill 5 件**~~ → **C-1〜C-5 完了 (2026-05-05)**
 3. ~~**Phase 1 (iv) 残り課題**~~ → **完了 (2026-05-05、commit 7dec7b6)**
 
-**残 BDD 系 (15 件)**: ~~shareholder-structure / business-portfolio / sga-breakdown / cost-breakdown / workforce-composition~~ (5 件完了 2026-05-06) / business-model / sales-by-customer / customer-sales-detail / scenario-forecast / current-period-forecast / valuation-summary / business-overview / その他戦略フレームワーク系。
+**残 BDD 系 (15 件)**: ~~shareholder-structure / business-portfolio / sga-breakdown / cost-breakdown / workforce-composition~~ (5 件完了 2026-05-06) / ~~business-model~~ / ~~sales-by-customer~~ (完了 2026-05-06) / ~~customer-sales-detail~~ / ~~scenario-forecast~~ (完了 2026-05-06) / ~~current-period-forecast~~ / ~~valuation-summary~~ (完了 2026-05-06) / ~~business-overview~~ (完了 2026-05-06) / その他戦略フレームワーク系。
 
 **現セッション完了分 (2026-05-06)**:
-- 累積 20 PPTX × 162 checks 全 PASS (前回 15 PPTX × 122 → +5 PPTX × 40 checks)
-- BDD 系 8 件完了 (BDD トリオ + 5 件、+ shareholder-structure / business-portfolio / sga-breakdown / cost-breakdown / workforce-composition)
-- 残 BDD 系 7 件 (business-overview / sales-by-customer / valuation-summary / scenario-forecast +
-  Pattern C 系 3 件 business-model / customer-sales-detail / current-period-forecast)
+- 累積 24 PPTX × 206 checks 全 PASS (前回 20 PPTX × 162 → +4 PPTX × 44 checks)
+- Pattern A BDD 系 4 件追加完了 (business-overview / sales-by-customer / valuation-summary / scenario-forecast)
+- valuation-summary は副次的に Phase 1.5 AST migration で混入していた `import os` 抜けバグも修正
+- 残 Pattern C 系 3 件 (business-model / customer-sales-detail / current-period-forecast)
 
 **company-deepdive-agent × roleup E2E**: 3 fill 完了したので次々セッションで実施可能。
 N=1 (二幸産業) work dir があれば流用、なければ簡易 E2E driver を整備して回す。
