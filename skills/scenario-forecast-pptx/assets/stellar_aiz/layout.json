@@ -1,0 +1,19 @@
+{
+  "_comment": "stella V1 hardcode 互換 (16:9, 13.33×7.50 in)。左右 2 チャート + 各右側にシリーズ凡例。",
+  "left_chart_x_in": 0.41,
+  "left_chart_w_in": 5.20,
+  "left_legend_x_in": 5.65,
+  "right_chart_x_in": 6.80,
+  "right_chart_w_in": 5.20,
+  "right_legend_x_in": 12.04,
+  "chart_title_y_in": 1.40,
+  "chart_title_line_y_in": 1.75,
+  "unit_y_in": 1.80,
+  "chart_y_in": 1.95,
+  "chart_h_in": 4.50,
+  "period_legend_y_in": 6.60,
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 8.00,
+  "source_h_in": 0.30
+}

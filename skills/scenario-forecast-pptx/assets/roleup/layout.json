@@ -1,0 +1,19 @@
+{
+  "_comment": "Roleup A4 横 (11.693×8.268 in)。左右 2 チャート、横方向に詰めて凡例エリアを確保。",
+  "left_chart_x_in": 0.41,
+  "left_chart_w_in": 4.55,
+  "left_legend_x_in": 5.00,
+  "right_chart_x_in": 6.07,
+  "right_chart_w_in": 4.55,
+  "right_legend_x_in": 10.66,
+  "chart_title_y_in": 1.45,
+  "chart_title_line_y_in": 1.78,
+  "unit_y_in": 1.83,
+  "chart_y_in": 2.00,
+  "chart_h_in": 5.00,
+  "period_legend_y_in": 7.10,
+  "source_x_in": 0.41,
+  "source_y_in": 7.57,
+  "source_w_in": 10.88,
+  "source_h_in": 0.44
+}

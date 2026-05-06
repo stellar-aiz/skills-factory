@@ -597,6 +597,7 @@ PROFILES: dict[tuple, list[Callable]] = {
         r for r in _COMMON_ROLEUP_RULES
         if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
     ],
+    ("scenario-forecast-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
     # stella 版は ISSUE-010 で stella 仕様確定後に追加 (現状 skeleton)
     ("customer-profile-pptx", "stellar_aiz"): [],   # TODO: ISSUE-010
     ("market-environment-pptx", "stellar_aiz"): [], # TODO: ISSUE-010
@@ -621,6 +622,7 @@ PROFILES: dict[tuple, list[Callable]] = {
     ("business-overview-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
     ("sales-by-customer-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
     ("valuation-summary-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("scenario-forecast-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
 }
 
 
