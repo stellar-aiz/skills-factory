@@ -1,0 +1,10 @@
+{
+  "_comment": "stella V1 hardcode 互換 (16:9, 13.33×7.50 in)。チャートエリアは Title/Subtitle 下から下マージン手前まで。",
+  "margin_l_in": 0.405,
+  "chart_top_in": 1.531,
+  "chart_bottom_in": 7.000,
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 8.00,
+  "source_h_in": 0.30
+}

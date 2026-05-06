@@ -1,6 +1,7 @@
 {
-  "main_message": "〜すべき",
+  "main_message": "DCF・類似企業比較・先例取引の3手法レンジが収束する90-110億円を推定レンジとすべき",
   "chart_title": "バリュエーション・レンジ分析",
+  "source": "DCFモデル / Bloomberg類似企業比較 / Mergermarket先例取引DB",
   "chart_type": "football_field",
   "football_field": {
     "unit": "億円",
