@@ -35,6 +35,9 @@ from lxml import etree
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from validate_fill_input import validate_fill_input  # noqa: E402
+
+SKILL_ID = "current-period-forecast-pptx"
 
 
 def _finalize_pptx(path):
@@ -419,6 +422,20 @@ def main():
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # ISSUE-012 (2026-05-06): スキーマ齟齬の silent fail 防止
+    validate_fill_input(
+        data,
+        required_top=["main_message", "rows"],
+        allowed_top=[
+            "main_message", "chart_title", "source",
+            "rows", "item_header", "period_label", "unit_label",
+            "management_plan_label", "our_plan_label",
+            "upside_label", "downside_label",
+            "title", "subtitle",
+        ],
+        skill_name=SKILL_ID,
+    )
 
     print("=== 当期着地見込みスライド生成 ===")
 

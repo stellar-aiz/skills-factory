@@ -26,6 +26,7 @@ import math
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import add_brand_arg  # noqa: E402
+from validate_fill_input import validate_fill_input  # noqa: E402
 from pptx import Presentation
 from pptx.util import Pt, Emu
 from pptx.oxml.ns import qn
@@ -394,6 +395,14 @@ def main():
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # ISSUE-012 (2026-05-06): スキーマ齟齬の silent fail 防止
+    validate_fill_input(
+        data,
+        required_top=["main_message", "kpis"],
+        allowed_top=["main_message", "chart_title", "kpis"],
+        skill_name="kpi-dashboard-pptx",
+    )
 
     prs = Presentation(args.template)
 
