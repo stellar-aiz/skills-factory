@@ -24,6 +24,7 @@ SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
 from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
 from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+from validate_fill_input import validate_fill_input  # noqa: E402
 
 SKILL_ID = "executive-summary-pptx"
 
@@ -477,6 +478,21 @@ def main():
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # ISSUE-012 (2026-05-06): スキーマ齟齬の silent fail 防止
+    # 必須キー欠落で hard-fail、想定外キーで stderr WARN を出す。
+    # 値の妥当性検査（main_message 65字、category 8字等）は _validate_input 側。
+    validate_fill_input(
+        data,
+        required_top=["main_message", "findings"],
+        allowed_top=[
+            "main_message", "chart_title", "findings", "source",
+            # roleup brand で resolve_top_text/subtitle_text が読む可能性のあるキー
+            "title", "subtitle",
+        ],
+        per_item_required={"findings": ["category", "heading", "detail"]},
+        skill_name=SKILL_ID,
+    )
 
     # Roleup: source field is required (hard-fail). Stella: no-op (no requirement).
     require_source(data, theme, skill_id=SKILL_ID)

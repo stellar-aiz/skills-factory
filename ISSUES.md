@@ -880,3 +880,16 @@ ISSUE-010 Phase 2 の主要レイヤー終結。残 fill (BDD 系の一部、Pat
 - executive-summary-pptx / table-of-contents-pptx / section-divider-pptx / data-availability-pptx（オプショナルフィールドが多いスキル）
 - 段階的に `validate_fill_input` 呼び出しを追加。各スキル 5-10 分の作業量見込み（必須/任意キーリスト確定 + 1 箇所追記 + 動作確認）
 - 25-30 スキル全件横展開は 1-2 セッションで完結可能
+
+### Phase 2 実装内容（2026-05-06）— 優先 4 件完了
+
+「オプショナルフィールドが多い」最優先 4 件に `validate_fill_input` を導入完了：
+
+| # | スキル | required_top | per_item_required | smoke 結果 |
+|---|---|---|---|---|
+| 1 | executive-summary-pptx | `main_message / findings` | `findings: [category, heading, detail]` | 正規/欠落/不明キー 3 パターン PASS |
+| 2 | table-of-contents-pptx | `sections` | `sections: [title, page]` | 同上 |
+| 3 | section-divider-pptx | `section_number / title` | — | 同上 |
+| 4 | data-availability-pptx | `main_message / categories` | `categories: [name, items]` | 同上 |
+
+**残り 25 件横展開**は別コミットで段階的に対応。market 系 5 fill (market-environment / market-share / competitor-summary / market-kbf / pest-analysis) は既に hard-fail 動作確認済（2026-05-06 セッションで初回エラーを出した）ため後回し可、`positioning-map` 同様の sample_data 駆動で進める。
