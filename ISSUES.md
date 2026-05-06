@@ -635,9 +635,9 @@ add_brand_arg(<parser_var>)  # passive: accepted but ignored until brand migrati
 | C-6 | `section-divider-pptx` | ✅ 完了 | A (装飾系、C4 除外 profile) | `63e2773`(2026-05-05) |
 | C-7 | `table-of-contents-pptx` | ✅ 完了 | A | `23abee4`(2026-05-05) |
 | C-8 | `data-availability-pptx` | ✅ 完了 | A | `6f3cc31`(2026-05-05) |
-| 2 | `revenue-analysis-pptx` | ⏳ 未着手 | A 想定 | — |
-| 3 | `financial-benchmark-pptx` | ⏳ 未着手 | A 想定 | — |
-| 4 | `company-overview-pptx-v2` | ⏳ 未着手 | A or B | — |
+| 2 | `revenue-analysis-pptx` | ✅ 完了 | A (hardcode 駆動) | (next commit)(2026-05-06) |
+| 3 | `financial-benchmark-pptx` | ✅ 完了 | A (hardcode 駆動) | (next commit)(2026-05-06) |
+| 4 | `company-overview-pptx-v2` | ✅ 完了 | A (hardcode 駆動 + 専用テンプレ生成スクリプト) | (next commit)(2026-05-06) |
 
 ### market-overview-agent × roleup フルネイティブ達成（2026-05-05）
 
@@ -659,22 +659,43 @@ market-overview-agent デッキ 12 スライド全てが roleup native 化。
 
 ### 既知の sample_data 不備（Phase 2 残課題、優先度低）
 
-セッション中に累積 compliance check 走行中、以下 2 件の sample_data が hard-fail:
+~~セッション中に累積 compliance check 走行中、以下 2 件の sample_data が hard-fail:~~
+~~- `executive-summary-pptx/references/sample_data.json`: findings[1].detail = 103 chars (上限 100)~~
+~~- `pest-analysis-pptx/references/sample_data.json`: main_message = 66 chars (上限 65)~~
 
-- `executive-summary-pptx/references/sample_data.json`: findings[1].detail = 103 chars (上限 100)
-- `pest-analysis-pptx/references/sample_data.json`: main_message = 66 chars (上限 65)
+→ **完了 (2026-05-06、commit `50f38d2`)**:
+- executive-summary findings[1].detail 103 → 91 chars
+- pest-analysis main_message 66 → 63 chars
+両 fill は累積 compliance check 対象に復帰した。
 
-両者とも実装ロジック自体は正しい (E2E data では問題なく完走、smoke test も sample 以外で PASS)。
-sample_data の文字数を 1〜3 文字削るだけの修正で、ISSUE-010 Phase 2 の本筋とは独立。
-次回 sample_data メンテナンス時に対応する。
+### BDD トリオ完結 (2026-05-06)
+
+revenue-analysis / financial-benchmark / company-overview-pptx-v2 の 3 fill 完了で、
+`company-deepdive-agent` デッキ (会社レベル + 事業セグメント) の core 構成が
+roleup ネイティブで生成可能に。
+
+**累積 compliance check (2026-05-06)**: 15 PPTX × 122 checks 全 PASS
+- pilot 3 (cp/me/ch) + market 系 5 (market-share/positioning-map/competitor-summary/market-kbf/pest-analysis)
+- 装飾系 3 (section-divider/TOC/data-availability) + executive-summary
+- BDD 3 (revenue-analysis/financial-benchmark/company-overview-pptx-v2)
+
+### 設計判断ログ (2026-05-06、ユーザー判断)
+
+| 件 | 選択肢 | 採用 | 理由 |
+|---|---|---|---|
+| revenue-analysis EBITDA 棒色 | chart_palette[3] / chart_palette[1] / accent_ebitda_bar 新設 | **chart_palette[1] = #897141 (ベージュ)** | 茶系隣接トーン、Revenue (#7C4C2C) + Margin Line (#604C3F) と 3 色で brand 一貫性高 |
+| financial-benchmark マイナス値バー | 純赤維持 / accent_op_margin_line / negative_bar 新設 | **accent_op_margin_line (#604C3F)** | 財務文化の純赤を捨てて brand 一貫性優先。対象会社 negative も同色 + bold で識別 |
 
 ### Phase 2 着手点（次セッション以降）
 
-1. **BDD 系 fill 14 件の brand-aware 化** を Pattern A/B/C で順次。優先順: ~executive-summary~ → revenue-analysis → data-availability → financial-benchmark → company-overview-pptx-v2。各 fill は既に `add_brand_arg(parser)` を呼んでいるので、`args.brand` を読み出して `resolve_brand` で theme を取り、Pattern A (hardcode 駆動) / Pattern B (rPr/tcPr 駆動) / Pattern C (HTML 駆動) で brand 別出力を実装。
-2. ~~**市場系 fill 5 件**（market-share / positioning-map / competitor-summary / market-kbf / pest-analysis）の brand-aware 化（market-overview-agent × roleup の完全 native 化に必要）~~ → **C-1〜C-5 全件完了 (2026-05-05)**。
-3. ~~**Phase 1 (iv) 残り課題**~~ → **完了 (2026-05-05、commit 7dec7b6)**:
-   - ~~項目 2: テンプレート/script 命名不統一（toc/section-divider/market-kbf）~~ → 統一済み
-   - ~~項目 3: pilot 3 (market-environment) × roleup の year suffix（"2025E"）~~ → fill 側で strip 実装済み (`_year_to_int`)
+1. ~~**BDD 系 fill 3 件 brand-aware 化**~~ → **完了 (2026-05-06)**: revenue-analysis / financial-benchmark / company-overview-pptx-v2
+2. ~~**市場系 fill 5 件**~~ → **C-1〜C-5 完了 (2026-05-05)**
+3. ~~**Phase 1 (iv) 残り課題**~~ → **完了 (2026-05-05、commit 7dec7b6)**
+
+**残 BDD 系 (15 件)**: shareholder-structure / business-portfolio / business-model / sales-by-customer / customer-sales-detail / workforce-composition / cost-breakdown / scenario-forecast / current-period-forecast / valuation-summary / sga-breakdown / business-overview / その他戦略フレームワーク系。
+
+**company-deepdive-agent × roleup E2E**: 3 fill 完了したので次々セッションで実施可能。
+N=1 (二幸産業) work dir があれば流用、なければ簡易 E2E driver を整備して回す。
 
 ### executive-summary-pptx 完了内容（2026-05-05、commit `a96f53f`）
 
