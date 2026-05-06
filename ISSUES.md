@@ -804,7 +804,7 @@ ISSUE-010 Phase 2 の主要レイヤー終結。残 fill (BDD 系の一部、Pat
 
 ## ISSUE-012: fill_*.py のスキーマ齟齬を silent に通す問題（特に positioning-map-pptx）
 
-**Status**: 進行中（Phase 1 完了） / **Priority**: P2 / **Decided**: 2026-05-06 / **Updated**: 2026-05-06 (Phase 1 で positioning-map に方針 (a) を実装、3 orchestrator に運用ガード追記)
+**Status**: 完了 / **Priority**: P2 / **Decided**: 2026-05-06 / **Updated**: 2026-05-06 (Phase 1 + Phase 2 完了、fill 機構を持つ全 47 件に validate_fill_input 適用済 + 3 orchestrator に運用ガード追記)
 
 ### 背景
 
@@ -893,3 +893,26 @@ ISSUE-010 Phase 2 の主要レイヤー終結。残 fill (BDD 系の一部、Pat
 | 4 | data-availability-pptx | `main_message / categories` | `categories: [name, items]` | 同上 |
 
 **残り 25 件横展開**は別コミットで段階的に対応。market 系 5 fill (market-environment / market-share / competitor-summary / market-kbf / pest-analysis) は既に hard-fail 動作確認済（2026-05-06 セッションで初回エラーを出した）ため後回し可、`positioning-map` 同様の sample_data 駆動で進める。
+
+### Phase 2 完了（2026-05-06）— 全 PPTX スキル横展開
+
+優先 4 件に続き、3 バッチで残り PPTX スキル 43 件中 42 件に `validate_fill_input` を導入完了（fill 機構を持たない `nttdata-pptx` のみ対象外）。全件 sample_data 経由で正常動作 + 必須キー欠落で hard-fail 動作を確認済。
+
+**Status**: 進行中 → **完了** に格上げ（Phase 1 + Phase 2 で対応 fill = 47 件、残 0 件）
+
+| バッチ | 対象 | 件数 | コミット |
+|---|---|---|---|
+| Phase 1 | positioning-map-pptx + helper 新設 | 1 | `6a132d6` |
+| Phase 2-A | 優先 4 件 (executive-summary / table-of-contents / section-divider / data-availability) | 4 | `e561b26` |
+| Phase 2-B | 市場系 5 + BDD/会社系 10 | 15 | `eb566b8` |
+| Phase 2-C | 戦略フレームワーク 5 + 図表/チャート系 18 | 23 | `ce36de5` |
+| Phase 2-D | smallcap 5 件 (html2pptx ベースに sys.path 注入で接続) | 5 | (本コミット) |
+| **合計** | | **48** | |
+
+**運用ルール（Phase 1 から継続）**: 3 orchestrator (market-overview-agent / strategy-report-agent / company-deepdive-agent) の SKILL.md に「fill_*.py 起動前に sample_data.json を必ず Read」のガード文言が追記済み。新規 PPTX スキルを追加するときは:
+1. `references/sample_data.json` を作成
+2. `fill_*.py` の `json.load` 直後に `validate_fill_input(...)` を呼ぶ
+3. `required_top` は「これが無いと silent fail になる」最小集合に絞る
+4. `allowed_top` は brand-aware fill なら `title` / `subtitle` も含める（`resolve_top_text` / `resolve_subtitle_text` 由来）
+
+を必須プロセスとする。

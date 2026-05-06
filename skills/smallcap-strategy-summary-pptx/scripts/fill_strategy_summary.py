@@ -17,6 +17,11 @@ import sys
 import tempfile
 from html import escape
 
+# validate_fill_input bootstrap (skills/_common/lib)
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
+from validate_fill_input import validate_fill_input  # noqa: E402
+
 from pptx import Presentation
 from pptx.util import Inches
 from pptx.oxml.ns import qn
@@ -213,6 +218,14 @@ def main():
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # ISSUE-012 (2026-05-06): スキーマ齟齬の silent fail 防止
+    validate_fill_input(
+        data,
+        required_top=["main_message", "dimensions"],
+        allowed_top=["main_message", "chart_title", "dimensions", "implications"],
+        skill_name="smallcap-strategy-summary-pptx",
+    )
 
     print("📐 Generating 4-dimension grid HTML (chart only)...")
     html_content = generate_html(data)
