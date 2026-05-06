@@ -1,0 +1,16 @@
+{
+  "_comment": "stella 16:9 (13.33×7.50 in) の forecast-template (company-overview派生)。Content Area が画像挿入領域。",
+  "title_x_in": 0.41,
+  "title_y_in": 0.61,
+  "title_w_in": 12.52,
+  "title_h_in": 0.44,
+  "chart_title_y_in": 1.07,
+  "content_x_in": 0.41,
+  "content_y_in": 1.50,
+  "content_w_in": 12.52,
+  "content_h_in": 5.40,
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 8.00,
+  "source_h_in": 0.30
+}
