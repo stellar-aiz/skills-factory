@@ -1,0 +1,15 @@
+{
+  "_comment": "stella V1 hardcode 互換 (16:9, 13.33×7.50 in)。",
+  "panel_y_in": 1.50,
+  "chart_x_in": 0.50,
+  "chart_w_in": 8.50,
+  "chart_h_in": 5.00,
+  "chart_y_offset_in": 0.55,
+  "legend_x_in": 9.30,
+  "legend_w_in": 3.80,
+  "legend_bottom_in": 6.30,
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 12.50,
+  "source_h_in": 0.30
+}

@@ -16,7 +16,7 @@ description: >
   - ユーザーが勘定科目別の販管費データ（Excel等）をアップロードして、スライド化を求めた場合
   - 「費用構成」「コスト推移」「経費分析」をスライドにしたいという要望
   - 「積み上げ棒グラフ＋折れ線」を販管費・経費の文脈で作りたいという要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -205,10 +205,14 @@ python <SKILL_DIR>/scripts/parse_sga_excel.py \
 
 ```bash
 python <SKILL_DIR>/scripts/fill_sga_breakdown.py \
+  --brand {stellar_aiz|roleup} \
   --data {{WORK_DIR}}/sga_breakdown_data.json \
-  --template <SKILL_DIR>/assets/sga-breakdown-template.pptx \
   --output {{OUTPUT_DIR}}/SGA_Breakdown_output.pptx
 ```
+
+`--brand` 省略時は `stellar_aiz`(16:9, Meiryo UI, V1 配色)。
+`--brand roleup` 指定時は A4 横テンプレ + Yu Gothic UI 10pt + 茶系 line color (theme.accent_op_margin_line) + Source 3 placeholder 6pt。
+`--template` 明示指定で brand_resolver の解決を上書き可能(通常不要)。
 
 ※ `<SKILL_DIR>` は実際のスキルインストールパスに置き換えること。
 
@@ -288,7 +292,10 @@ python -m markitdown {{OUTPUT_DIR}}/SGA_Breakdown_output.pptx
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/sga-breakdown-template.pptx` | スライドテンプレート（market-environment-templateベース） |
+| `assets/stellar_aiz/sga-breakdown-template.pptx` | stella 16:9 テンプレート(Title 1 / Text Placeholder 2 / Source / Content Area) |
+| `assets/stellar_aiz/layout.json` | stella レイアウト座標 (chart / legend / source) |
+| `assets/roleup/sga-breakdown-template.pptx` | roleup A4 横テンプレート(cp roleup template から派生、Title 1 / Text Placeholder 2 / Source 3 + 茶色ガイド矩形) |
+| `assets/roleup/layout.json` | roleup レイアウト座標 (A4 横、chart 左寄り + legend 右側) |
 
 ## スクリプト
 
