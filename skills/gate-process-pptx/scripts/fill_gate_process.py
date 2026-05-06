@@ -22,6 +22,7 @@ fill_gate_process.py — ゲートプロセスデータをPPTXテンプレート
 """
 
 import argparse
+import os
 import json
 import sys
 

@@ -19,6 +19,7 @@ fill_pyramid_native.py — N段ピラミッドをPowerPointネイティブオブ
 """
 
 import argparse
+import os
 import json
 import sys
 

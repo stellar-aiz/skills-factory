@@ -8,8 +8,10 @@ Usage:
 """
 
 import argparse
-import json
 import copy
+import json
+import os
+import sys
 
 # brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
