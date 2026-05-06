@@ -17,7 +17,7 @@ description: >
   - ユーザーがIM（インフォメーション・メモランダム）や会社HPの人員情報を貼り付けて、人員構成のスライド化を求めた場合
   - 「部署別人数」「部署サマリー」「組織別人員」をスライドにしたいという要望
   - 「有資格者数」「管理職数」「平均年齢」「平均勤続年数」を含む人員テーブルのスライド化を求められた場合
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -227,10 +227,14 @@ TEMPLATE="<SKILL_DIR>/assets/workforce-composition-template.pptx"
 pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_workforce_composition.py \
+  --brand {stellar_aiz|roleup} \
   --data {{WORK_DIR}}/workforce_composition_data.json \
-  --template <SKILL_DIR>/assets/workforce-composition-template.pptx \
   --output {{OUTPUT_DIR}}/WorkforceComposition_output.pptx
 ```
+
+`--brand` 省略時は `stellar_aiz`(16:9, Meiryo UI, V1 配色)。
+`--brand roleup` 指定時は A4 横テンプレ + Yu Gothic UI 10pt + 茶系 chart_palette + Source 3 placeholder 6pt + サブヘッダ 12pt subtitle 色 (#897141)。
+`--template` 明示指定で brand_resolver の解決を上書き可能。
 
 ※ `<SKILL_DIR>` は実際のスキルインストールパスに置き換えること。
 
@@ -322,7 +326,10 @@ python -m markitdown {{OUTPUT_DIR}}/WorkforceComposition_output.pptx
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/workforce-composition-template.pptx` | スライドテンプレート（company-history-templateベース） |
+| `assets/stellar_aiz/workforce-composition-template.pptx` | stella 16:9 テンプレート(Title 1 / Text Placeholder 2) |
+| `assets/stellar_aiz/layout.json` | stella レイアウト座標 (左右パネル + chart/table 高さ) |
+| `assets/roleup/workforce-composition-template.pptx` | roleup A4 横テンプレート(cp roleup template から派生、Title 1 / Text Placeholder 2 / Source 3 + 茶色ガイド矩形) |
+| `assets/roleup/layout.json` | roleup レイアウト座標 (A4 横、左右 0.41in マージン) |
 
 ## スクリプト
 

@@ -580,6 +580,7 @@ PROFILES: dict[tuple, list[Callable]] = {
     ("business-portfolio-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
     ("sga-breakdown-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
     ("cost-breakdown-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
+    ("workforce-composition-pptx", "roleup"): list(_COMMON_ROLEUP_RULES),
     # stella 版は ISSUE-010 で stella 仕様確定後に追加 (現状 skeleton)
     ("customer-profile-pptx", "stellar_aiz"): [],   # TODO: ISSUE-010
     ("market-environment-pptx", "stellar_aiz"): [], # TODO: ISSUE-010
@@ -600,6 +601,7 @@ PROFILES: dict[tuple, list[Callable]] = {
     ("business-portfolio-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
     ("sga-breakdown-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
     ("cost-breakdown-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("workforce-composition-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
 }
 
 
