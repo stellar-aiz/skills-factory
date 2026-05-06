@@ -10,8 +10,9 @@ fill_value_chain.py — バリューチェーン分析スライドをPPTXネイ�
 Usage:
   python fill_value_chain.py \
     --data /home/claude/value_chain_data.json \
-    --template <path>/value-chain-template.pptx \
-    --output /mnt/user-data/outputs/ValueChain_output.pptx
+    [--template <path>/value-chain-template.pptx] \
+    --output /mnt/user-data/outputs/ValueChain_output.pptx \
+    [--brand stellar_aiz | roleup]
 """
 
 import argparse
@@ -19,10 +20,14 @@ import json
 import os
 import sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+
+SKILL_ID = "value-chain-pptx"
+_THEME = None
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
@@ -67,8 +72,10 @@ def _finalize_pptx(path):
 
 
 
+# ── Layout Constants (stella 16:9, 13.33 x 7.5 in; _apply_theme で roleup A4 用にスケール) ──
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE = "Text Placeholder 2"
+SHAPE_SOURCE_PH = "Source 3"  # roleup placeholder
 
 CHAIN_LEFT = Inches(0.41)
 CHAIN_TOP = Inches(1.80)
@@ -85,6 +92,7 @@ SOURCE_X = Inches(0.41)
 SOURCE_Y = Inches(7.05)
 SOURCE_W = Inches(12.50)
 
+# ── Colors (stella defaults; _apply_theme で roleup 用に上書き) ──
 COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
 COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
 COLOR_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
@@ -100,6 +108,7 @@ CHEVRON_COLORS = [
     RGBColor(0x88, 0xB8, 0xD8),
 ]
 
+# 利益プール / ポジション色は universal indicator (信号色) として両 brand で維持
 COLOR_PROFIT_HIGH = RGBColor(0x1B, 0x7A, 0x3B)
 COLOR_PROFIT_MID = RGBColor(0xDA, 0x7A, 0x2D)
 COLOR_PROFIT_LOW = RGBColor(0xB8, 0x3A, 0x3A)
@@ -107,6 +116,9 @@ COLOR_PROFIT_LOW = RGBColor(0xB8, 0x3A, 0x3A)
 COLOR_STRONG = RGBColor(0x1B, 0x7A, 0x3B)
 COLOR_MEDIUM = RGBColor(0xDA, 0x7A, 0x2D)
 COLOR_WEAK = RGBColor(0xB8, 0x3A, 0x3A)
+
+# 示唆ブレットマーカー色 (brand-aware で上書き)
+COLOR_BULLET = RGBColor(0x2E, 0x4A, 0x6B)
 
 FONT_NAME_JP = "Meiryo UI"
 FONT_SIZE_STAGE_NAME = Pt(13)
@@ -116,6 +128,72 @@ FONT_SIZE_POSITION = Pt(11)
 FONT_SIZE_FOOTER = Pt(11)
 FONT_SIZE_SOURCE = Pt(10)
 FONT_SIZE_SECTION = Pt(13)
+
+
+def _apply_theme(theme):
+    """roleup の場合、レイアウト・色・フォントサイズを brand 仕様に上書きする。"""
+    global CHAIN_LEFT, CHAIN_TOP, CHAIN_WIDTH, CHAIN_HEIGHT
+    global DETAIL_TOP, DETAIL_HEIGHT, FOOTER_TOP, FOOTER_HEIGHT
+    global SOURCE_X, SOURCE_Y, SOURCE_W
+    global COLOR_TEXT, COLOR_SOURCE, COLOR_SUBTEXT
+    global CHEVRON_COLORS, COLOR_BULLET
+    global FONT_NAME_JP
+    global FONT_SIZE_STAGE_NAME, FONT_SIZE_ACTIVITY, FONT_SIZE_PROFIT
+    global FONT_SIZE_POSITION, FONT_SIZE_FOOTER, FONT_SIZE_SOURCE, FONT_SIZE_SECTION
+    global _THEME
+    _THEME = theme
+
+    if theme.id != "roleup":
+        return
+
+    # A4 横 (11.69 × 8.27) 用にレイアウト再計算
+    CHAIN_LEFT = Inches(0.41)
+    CHAIN_TOP = Inches(1.55)
+    CHAIN_WIDTH = Inches(10.87)
+    CHAIN_HEIGHT = Inches(2.30)
+
+    DETAIL_TOP = Inches(3.95)
+    DETAIL_HEIGHT = Inches(1.50)
+
+    FOOTER_TOP = Inches(5.60)
+    FOOTER_HEIGHT = Inches(1.75)
+
+    SOURCE_X = Inches(0.41)
+    SOURCE_Y = Inches(7.45)
+    SOURCE_W = Inches(10.87)
+
+    # roleup 茶系トーン
+    COLOR_TEXT = theme.color("text")
+    COLOR_SOURCE = theme.color("source")
+    COLOR_SUBTEXT = theme.color("source")
+
+    # シェブロン色は roleup chart_palette から茶系グラデーションを構成
+    # palette: ["#7C4C2C","#897141","#604C3F","#C78624","#AF7026","#3E3A39","#9C755F","#CDCECE"]
+    # 濃→淡で並べ替え: 604C3F, 7C4C2C, AF7026, 9C755F, C78624, 897141, CDCECE
+    palette_hex = list(theme.chart_palette) if theme.chart_palette else []
+    if palette_hex:
+        order = [2, 0, 4, 6, 3, 1, 7]
+        chev = []
+        for i in order:
+            if i < len(palette_hex):
+                hx = palette_hex[i].lstrip("#")
+                chev.append(RGBColor(int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)))
+        if chev:
+            CHEVRON_COLORS = chev
+
+    COLOR_BULLET = theme.color("label_bar")  # #7C4C2C
+
+    # フォント
+    FONT_NAME_JP = theme.font_ea or "Yu Gothic UI"
+
+    # roleup C4 許容集合 [22, 14, 12, 10, 6] pt
+    FONT_SIZE_STAGE_NAME = Pt(12)
+    FONT_SIZE_ACTIVITY = Pt(10)
+    FONT_SIZE_PROFIT = Pt(12)
+    FONT_SIZE_POSITION = Pt(10)
+    FONT_SIZE_FOOTER = Pt(10)
+    FONT_SIZE_SOURCE = Pt(int(theme._defaults.get("font_size_source_pt", 6)))
+    FONT_SIZE_SECTION = Pt(12)
 
 
 def find_shape(slide, name):
@@ -143,7 +221,10 @@ def set_textbox_text(shape, text):
 
 def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
                  color=None, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
-                 font_name=FONT_NAME_JP):
+                 font_name=None):
+    """汎用テキストボックス (font_name は late-resolve で _apply_theme 後の値を使う)"""
+    if font_name is None:
+        font_name = FONT_NAME_JP
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
     tf.word_wrap = True
@@ -350,6 +431,9 @@ def draw_footer(slide, implications, left, top, width, height):
     for p in list(tf.paragraphs):
         p._p.getparent().remove(p._p)
 
+    bullet_hex = "{:02X}{:02X}{:02X}".format(COLOR_BULLET[0], COLOR_BULLET[1], COLOR_BULLET[2])
+    text_hex = "{:02X}{:02X}{:02X}".format(COLOR_TEXT[0], COLOR_TEXT[1], COLOR_TEXT[2])
+
     for i, item in enumerate(implications):
         if isinstance(item, dict):
             text = item.get("text", "")
@@ -369,7 +453,7 @@ def draw_footer(slide, implications, left, top, width, height):
         buFont = etree.SubElement(pPr, qn("a:buFont"), attrib={"typeface": "Arial"})
         buClr = etree.SubElement(pPr, qn("a:buClr"))
         buClrSolid = etree.SubElement(buClr, qn("a:srgbClr"))
-        buClrSolid.set("val", "2E4A6B")
+        buClrSolid.set("val", bullet_hex)
 
         r = etree.SubElement(p_elem, qn("a:r"))
         rPr = etree.SubElement(r, qn("a:rPr"), attrib={
@@ -380,7 +464,7 @@ def draw_footer(slide, implications, left, top, width, height):
         etree.SubElement(rPr, qn("a:ea"), attrib={"typeface": FONT_NAME_JP})
         sf = etree.SubElement(rPr, qn("a:solidFill"))
         s = etree.SubElement(sf, qn("a:srgbClr"))
-        s.set("val", "333333")
+        s.set("val", text_hex)
         t = etree.SubElement(r, qn("a:t"))
         t.text = text
 
@@ -388,20 +472,34 @@ def draw_footer(slide, implications, left, top, width, height):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--template", required=True)
+    ap.add_argument("--template", required=False, default=None)
     ap.add_argument("--output", required=True)
-    add_brand_arg(ap)  # passive: accepted but ignored until brand migration
+    add_brand_arg(ap)
     args = ap.parse_args()
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    prs = Presentation(args.template)
+    # Phase 2: brand-aware
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    require_source(data, theme, skill_id=SKILL_ID)
+    template_path = args.template or theme.template_path(SKILL_DIR, "value-chain")
+
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), data.get("main_message", ""))
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), data.get("chart_title", "バリューチェーン分析"))
-    print(f"  ✓ Main Message & Chart Title set")
+    # Top text (stella: main_message / roleup: chart_title)
+    top_text = resolve_top_text(data, theme).strip()
+    if top_text:
+        set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+        print(f"  ✓ Top: {top_text[:60]}{'...' if len(top_text) > 60 else ''}")
+
+    # Subtitle (stella: chart_title / roleup: main_message)
+    sub_text = resolve_subtitle_text(data, theme).strip()
+    if sub_text:
+        set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
+        print(f"  ✓ Subtitle: {sub_text[:60]}{'...' if len(sub_text) > 60 else ''}")
 
     stages = data.get("stages", [])
     if not stages:
@@ -423,14 +521,27 @@ def main():
     if implications:
         print(f"  ✓ 示唆: {len(implications)}項目")
 
-    source = data.get("source", "")
+    # 出典 (roleup: Source 3 placeholder, stella: 動的 textbox)
+    source = (data.get("source") or data.get("source_label")
+              or data.get("source_text") or "").strip()
     if source:
-        add_text_box(
-            slide, source,
-            SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.25),
-            FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
-            align=PP_ALIGN.LEFT,
-        )
+        if theme.is_source_required():
+            src_shape = find_shape(slide, SHAPE_SOURCE_PH)
+            if src_shape is not None:
+                set_textbox_text(src_shape, f"出典: {source}")
+                for para in src_shape.text_frame.paragraphs:
+                    for run in para.runs:
+                        run.font.size = FONT_SIZE_SOURCE
+                        run.font.color.rgb = COLOR_SOURCE
+                        run.font.name = FONT_NAME_JP
+        else:
+            add_text_box(
+                slide, source,
+                SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.25),
+                FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
+                align=PP_ALIGN.LEFT,
+            )
+        print(f"  ✓ Source: {source[:40]}...")
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     prs.save(args.output)

@@ -14,7 +14,7 @@ description: >
   - BDD（ビジネスDD）の文脈で業界の利益プール分析・バリューチェーン分析を求められた場合
   - 「どの工程で付加価値が生まれているか」「対象会社のポジションをチェーン上で可視化」という要望
   - ユーザーが業界の各工程・段階について情報を貼り付けて、スライド化を求めた場合
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -161,9 +161,12 @@ pip install python-pptx -q --break-system-packages
 
 python <SKILL_DIR>/scripts/fill_value_chain.py \
   --data {{WORK_DIR}}/value_chain_data.json \
-  --template <SKILL_DIR>/assets/value-chain-pptx-template.pptx \
-  --output {{OUTPUT_DIR}}/ValueChain_output.pptx
+  --output {{OUTPUT_DIR}}/ValueChain_output.pptx \
+  [--brand stellar_aiz | roleup]
 ```
+
+`--template` を省略すると `--brand` (default `stellar_aiz`) に応じて
+`assets/<brand>/value-chain-template.pptx` が自動解決される。
 
 ---
 
@@ -213,8 +216,10 @@ python <SKILL_DIR>/scripts/fill_value_chain.py \
 
 | ファイル | 用途 |
 |---|---|
-| `assets/value-chain-pptx-template.pptx` | スライドテンプレート |
-| `scripts/fill_value_chain.py` | 生成スクリプト |
+| `assets/stellar_aiz/value-chain-template.pptx` | stella ブランドのテンプレート (16:9) |
+| `assets/roleup/value-chain-template.pptx` | roleup ブランドのテンプレート (A4 横、Yu Gothic UI) |
+| `scripts/fill_value_chain.py` | 生成スクリプト (brand-aware) |
+| `scripts/build_roleup_template.py` | roleup テンプレ生成 (one-shot) |
 | `references/sample_data.json` | サンプルデータ（自動車業界の架空例） |
 
 ---
