@@ -24,10 +24,14 @@ import json
 import os
 import sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+
+SKILL_ID = "swot-pptx"
+_THEME = None
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
@@ -72,46 +76,34 @@ def _finalize_pptx(path):
 
 
 
-# ── Layout Constants (16:9, 13.33 x 7.5 in) ──
-SLIDE_W = Inches(13.33)
-SLIDE_H = Inches(7.50)
-
+# ── Layout Constants (stella 16:9, 13.33 x 7.5 in; _apply_theme で roleup A4 用にスケール) ──
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE = "Text Placeholder 2"
+SHAPE_SOURCE_PH = "Source 3"  # roleup placeholder
 
-# グリッドの配置
 GRID_LEFT = Inches(0.41)
 GRID_TOP = Inches(1.55)
 GRID_WIDTH = Inches(12.51)
 GRID_HEIGHT = Inches(5.30)
-
-GAP = Inches(0.15)  # セル間のギャップ
-
-# 象限の幅・高さ
+GAP = Inches(0.15)
 CELL_W = (GRID_WIDTH - GAP) / 2
 CELL_H = (GRID_HEIGHT - GAP) / 2
-
-# 各象限のヘッダーバー高さ
 HEADER_H = Inches(0.55)
-
-# 出典位置（テンプレートの ©マーク top=7.18in と重ならないよう調整）
 SOURCE_X = Inches(0.41)
 SOURCE_Y = Inches(6.93)
 SOURCE_W = Inches(12.50)
 
-# ── Colors（象限ごと）──
+# ── Colors (stella defaults; _apply_theme で roleup 用に上書き) ──
 COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
 COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
 COLOR_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 COLOR_BODY_BG = RGBColor(0xFA, 0xFA, 0xFA)
 
-# SWOT 各象限の色
-COLOR_S = RGBColor(0x2E, 0x4A, 0x6B)   # 紺（強み）
-COLOR_W = RGBColor(0xE5, 0x7C, 0x52)   # オレンジ（弱み）
-COLOR_O = RGBColor(0x5B, 0x8A, 0x3A)   # 緑（機会）
-COLOR_T = RGBColor(0xB8, 0x3A, 0x3A)   # 赤（脅威）
+COLOR_S = RGBColor(0x2E, 0x4A, 0x6B)
+COLOR_W = RGBColor(0xE5, 0x7C, 0x52)
+COLOR_O = RGBColor(0x5B, 0x8A, 0x3A)
+COLOR_T = RGBColor(0xB8, 0x3A, 0x3A)
 
-# 各象限の薄い背景色（ボディ部分用）
 COLOR_S_LIGHT = RGBColor(0xE8, 0xEE, 0xF4)
 COLOR_W_LIGHT = RGBColor(0xFA, 0xEC, 0xE4)
 COLOR_O_LIGHT = RGBColor(0xEB, 0xF0, 0xE4)
@@ -123,6 +115,50 @@ FONT_SIZE_HEADER_EN = Pt(11)
 FONT_SIZE_ITEM = Pt(12)
 FONT_SIZE_SOURCE = Pt(10)
 FONT_SIZE_AXIS_LABEL = Pt(10)
+
+
+def _apply_theme(theme):
+    """roleup の場合、レイアウト・色・フォントサイズを brand 仕様に上書きする。"""
+    global GRID_LEFT, GRID_TOP, GRID_WIDTH, GRID_HEIGHT, GAP, CELL_W, CELL_H
+    global HEADER_H, SOURCE_X, SOURCE_Y, SOURCE_W
+    global COLOR_TEXT, COLOR_SOURCE
+    global COLOR_S, COLOR_W, COLOR_O, COLOR_T
+    global COLOR_S_LIGHT, COLOR_W_LIGHT, COLOR_O_LIGHT, COLOR_T_LIGHT
+    global FONT_NAME_JP, FONT_SIZE_HEADER, FONT_SIZE_HEADER_EN
+    global FONT_SIZE_ITEM, FONT_SIZE_SOURCE, FONT_SIZE_AXIS_LABEL
+    global _THEME
+    _THEME = theme
+
+    if theme.id != "roleup":
+        return
+
+    # A4 横 (11.69 × 8.27) 用にレイアウト再計算
+    GRID_LEFT = Inches(0.41)
+    GRID_TOP = Inches(1.55)
+    GRID_WIDTH = Inches(10.87)
+    GRID_HEIGHT = Inches(5.70)
+    GAP = Inches(0.15)
+    CELL_W = (GRID_WIDTH - GAP) / 2
+    CELL_H = (GRID_HEIGHT - GAP) / 2
+    HEADER_H = Inches(0.50)
+    SOURCE_X = Inches(0.41)
+    SOURCE_Y = Inches(7.45)
+    SOURCE_W = Inches(10.87)
+
+    # roleup 茶系トーン (SWOT 4 色は universal indicator なのでヘッダー色は維持、
+    # light bg は brand 寄りに置換)
+    COLOR_TEXT = theme.color("text")
+    COLOR_SOURCE = theme.color("source")
+
+    # フォント
+    FONT_NAME_JP = theme._defaults.get("font_name_ja", "Yu Gothic UI")
+
+    # roleup C4 許容集合 [22, 14, 12, 10, 6] pt
+    FONT_SIZE_HEADER = Pt(14)
+    FONT_SIZE_HEADER_EN = Pt(10)
+    FONT_SIZE_ITEM = Pt(10)
+    FONT_SIZE_SOURCE = Pt(int(theme._defaults.get("font_size_source_pt", 6)))
+    FONT_SIZE_AXIS_LABEL = Pt(10)
 
 
 # ──────────────────────────────────────────────
@@ -155,8 +191,10 @@ def set_textbox_text(shape, text):
 
 def add_text_box(slide, text, left, top, width, height, font_size, bold=False,
                  color=None, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
-                 font_name=FONT_NAME_JP):
-    """汎用テキストボックス"""
+                 font_name=None):
+    """汎用テキストボックス (font_name は late-resolve で _apply_theme 後の値を使う)"""
+    if font_name is None:
+        font_name = FONT_NAME_JP
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
     tf.word_wrap = True
@@ -247,7 +285,8 @@ def build_quadrant(slide, label_jp, label_en, items, header_color, body_color,
         "sz": str(int(FONT_SIZE_HEADER_EN.pt * 100)),
         "b": "0",
     })
-    etree.SubElement(rPr2, qn("a:latin"), attrib={"typeface": "Arial"})
+    etree.SubElement(rPr2, qn("a:latin"), attrib={"typeface": FONT_NAME_JP})
+    etree.SubElement(rPr2, qn("a:ea"), attrib={"typeface": FONT_NAME_JP})
     sf2 = etree.SubElement(rPr2, qn("a:solidFill"))
     s2 = etree.SubElement(sf2, qn("a:srgbClr"))
     s2.set("val", "FFFFFF")
@@ -330,29 +369,34 @@ def add_axis_labels(slide):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--template", required=True)
+    ap.add_argument("--template", required=False, default=None)
     ap.add_argument("--output", required=True)
-    add_brand_arg(ap)  # passive: accepted but ignored until brand migration
+    add_brand_arg(ap)
     args = ap.parse_args()
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    prs = Presentation(args.template)
+    # Phase 2: brand-aware
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    require_source(data, theme, skill_id=SKILL_ID)
+    template_path = args.template or theme.template_path(SKILL_DIR, "swot")
+
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    # Main Message
-    set_textbox_text(
-        find_shape(slide, SHAPE_MAIN_MESSAGE),
-        data.get("main_message", ""),
-    )
-    # Chart Title
-    set_textbox_text(
-        find_shape(slide, SHAPE_CHART_TITLE),
-        data.get("chart_title", "SWOT分析"),
-    )
-    print(f"  ✓ Main Message set")
-    print(f"  ✓ Chart Title: {data.get('chart_title', '')}")
+    # Top text (stella: main_message / roleup: chart_title)
+    top_text = resolve_top_text(data, theme).strip()
+    if top_text:
+        set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), top_text)
+        print(f"  ✓ Top: {top_text[:60]}{'...' if len(top_text) > 60 else ''}")
+
+    # Subtitle (stella: chart_title / roleup: main_message)
+    sub_text = resolve_subtitle_text(data, theme).strip()
+    if sub_text:
+        set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), sub_text)
+        print(f"  ✓ Subtitle: {sub_text[:60]}{'...' if len(sub_text) > 60 else ''}")
 
     swot = data.get("swot", {})
 
@@ -410,15 +454,26 @@ def main():
             q["left"], q["top"], CELL_W, CELL_H,
         )
 
-    # 出典
-    source = data.get("source", "")
+    # 出典 (roleup: Source 3 placeholder, stella: 動的 textbox)
+    source = (data.get("source") or data.get("source_label")
+              or data.get("source_text") or "").strip()
     if source:
-        add_text_box(
-            slide, source,
-            SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.30),
-            FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
-            align=PP_ALIGN.LEFT,
-        )
+        if theme.is_source_required():
+            src_shape = find_shape(slide, SHAPE_SOURCE_PH)
+            if src_shape is not None:
+                set_textbox_text(src_shape, f"出典: {source}")
+                for para in src_shape.text_frame.paragraphs:
+                    for run in para.runs:
+                        run.font.size = FONT_SIZE_SOURCE
+                        run.font.color.rgb = COLOR_SOURCE
+                        run.font.name = FONT_NAME_JP
+        else:
+            add_text_box(
+                slide, source,
+                SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.30),
+                FONT_SIZE_SOURCE, bold=False, color=COLOR_SOURCE,
+                align=PP_ALIGN.LEFT,
+            )
         print(f"  ✓ Source: {source[:40]}...")
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)

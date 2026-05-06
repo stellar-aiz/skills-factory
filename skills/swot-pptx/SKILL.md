@@ -17,7 +17,7 @@ description: >
   - 「内部要因と外部要因で整理」「ポジショニング分析」という文脈でSWOTを作りたい場合
   - ユーザーが公式HP・IR・業界レポートの情報を貼り付けて、SWOT化を求めた場合
   - 既にSWOT形式で整理されたテキストが提示され、PowerPoint化を求められた場合
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
