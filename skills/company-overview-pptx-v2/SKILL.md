@@ -16,6 +16,7 @@ description: >
   - 「商号・所在地・設立・代表者をまとめてスライドに」のように会社基本情報の列挙を含む要望
   - ユーザーがインフォメーション・メモランダム（IM）や会社HPのURLを貼り付けて、会社概要のスライド化を求めた場合
   - 「対象会社概要」「ターゲット企業概要」「買収対象の会社概要」をスライドにしたいという要望
+supported_brands: [stellar_aiz, roleup]
 ---
 
 # 会社概要 PowerPoint ジェネレーター v2（BDD用）
@@ -386,11 +387,20 @@ TEMPLATE="{{SKILL_DIR}}/assets/company-overview-template.pptx"
 ```bash
 pip install python-pptx -q {{PIP_FLAGS}}
 
+# 推奨: brand 指定で起動（template は brand_resolver で自動解決）
 {{PYTHON_BIN}} {{SKILL_DIR}}/scripts/fill_company_overview.py \
+  --brand stellar_aiz \
   --data {{WORK_DIR}}/company_overview_data.json \
-  --template {{SKILL_DIR}}/assets/company-overview-template.pptx \
+  --output {{OUTPUT_DIR}}/CompanyOverview_output.pptx
+
+# Roleup 出力
+{{PYTHON_BIN}} {{SKILL_DIR}}/scripts/fill_company_overview.py \
+  --brand roleup \
+  --data {{WORK_DIR}}/company_overview_data.json \
   --output {{OUTPUT_DIR}}/CompanyOverview_output.pptx
 ```
+
+`--template` を明示指定すると brand 解決を上書きできる（任意）。
 
 ### 出力確認
 
@@ -427,7 +437,10 @@ PowerPoint生成後、以下を確認：
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/company-overview-template.pptx` | 会社概要スライドテンプレート（Shape構造は references/template-mapping.md 参照） |
+| `assets/stellar_aiz/company-overview-template.pptx` | Stella 16:9 用テンプレート |
+| `assets/stellar_aiz/layout.json` | Stella 用座標 (source dynamic textbox 用フォールバック) |
+| `assets/roleup/company-overview-template.pptx` | Roleup A4 横用テンプレート（`tools/setup_company_overview_roleup_template.py` で生成: cp roleup template ベース + Overview Table / Photo Area / Photo Caption を追加） |
+| `assets/roleup/layout.json` | Roleup 用座標 |
 
 ## スクリプト
 

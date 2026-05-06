@@ -1,0 +1,7 @@
+{
+  "_comment": "Stella 16:9 layout (13.33×7.50 in). Shape positions are baked into the template; fill reads them at runtime. Stored fields are coordinates for the dynamic source textbox (when SHAPE_SOURCE='Source' lookup misses).",
+  "source_x_in": 0.41,
+  "source_y_in": 7.05,
+  "source_w_in": 8.00,
+  "source_h_in": 0.30
+}

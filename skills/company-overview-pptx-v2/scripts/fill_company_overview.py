@@ -1,20 +1,25 @@
 """
 fill_company_overview.py — 会社概要データをPPTXネイティブオブジェクトで生成するスクリプト
 
-テンプレート構造（company-overview-template.pptx）:
-  - Title 1            (PLACEHOLDER): Main Message（上段、太字）
-  - Text Placeholder 2 (PLACEHOLDER): Chart Title（下段）
-  - Overview Table     (TABLE):       会社概要テーブル（2列: ラベル, 値）
-  - Photo Caption 1    (TEXT_BOX):    本社家屋キャプション
-  - Photo Area 1       (AUTO_SHAPE):  本社家屋画像エリア
-  - Photo Caption 2    (TEXT_BOX):    主要製品キャプション
-  - Photo Area 2       (AUTO_SHAPE):  主要製品画像エリア
-  - Source             (TEXT_BOX):    出典
+Phase 2 (ISSUE-010): brand-aware で stellar_aiz / roleup を出し分け。
 
-使い方:
-  python fill_company_overview.py \
+テンプレート構造:
+  Stella (assets/stellar_aiz/company-overview-template.pptx):
+    - Title 1            (PLACEHOLDER): Main Message (上段、太字)
+    - Text Placeholder 2 (PLACEHOLDER): Chart Title (下段)
+    - Overview Table     (TABLE):       会社概要テーブル
+    - Photo Caption 1/2  (TEXT_BOX):    写真キャプション
+    - Photo Area 1/2     (AUTO_SHAPE):  写真エリア
+    - Source             (TEXT_BOX):    出典
+  Roleup (assets/roleup/company-overview-template.pptx,
+          tools/setup_company_overview_roleup_template.py で生成):
+    - Title 1, Text Placeholder 2, Source 3 (PLACEHOLDER)
+    - Overview Table, Photo Caption 1/2, Photo Area 1/2 (cp roleup base に追加)
+    - 茶色ガイド `正方形/長方形 1` `正方形/長方形 8` は fill が silent_remove
+
+Usage:
+  python fill_company_overview.py --brand stellar_aiz \
     --data {{WORK_DIR}}/company_overview_data.json \
-    --template {{SKILL_DIR}}/assets/company-overview-template.pptx \
     --output {{OUTPUT_DIR}}/CompanyOverview_output.pptx
 """
 
@@ -24,10 +29,13 @@ import json
 import os
 import sys
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
+
+SKILL_ID = "company-overview-pptx-v2"
 
 from pptx import Presentation
 from pptx.util import Emu, Inches, Pt
@@ -70,8 +78,7 @@ def _finalize_pptx(path):
         pass
 
 
-
-# ── Shape名マッピング ──────────────────────────────────────
+# ── Shape names ─────────────────────────────────────────────
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE  = "Text Placeholder 2"
 SHAPE_TABLE        = "Overview Table"
@@ -79,8 +86,79 @@ SHAPE_CAPTION_1    = "Photo Caption 1"
 SHAPE_PHOTO_1      = "Photo Area 1"
 SHAPE_CAPTION_2    = "Photo Caption 2"
 SHAPE_PHOTO_2      = "Photo Area 2"
-SHAPE_SOURCE       = "Source"
 # ────────────────────────────────────────────────────────────
+
+# Defaults reassigned in main() via _apply_theme.
+SHAPE_SOURCE = "Source"  # stella; roleup uses 'Source 3'
+
+MAIN_MESSAGE_PT = 26
+MAIN_MESSAGE_BOLD = True
+CHART_TITLE_PT = 18
+CHART_TITLE_BOLD = True
+SOURCE_PT = 10
+
+SOURCE_X = Inches(0.41)
+SOURCE_Y = Inches(7.05)
+SOURCE_W = Inches(8.0)
+SOURCE_H = Inches(0.30)
+
+COLOR_TEXT = RGBColor(0x33, 0x33, 0x33)
+COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
+FONT_NAME_JP = "Meiryo UI"
+
+CELL_BG_EVEN = "F0F1F5"  # stella V1
+CELL_BG_ODD = "FFFFFF"
+
+_THEME = None
+
+
+def _apply_theme(theme):
+    """Reassign module-level brand-aware globals from a resolved BrandTheme."""
+    global _THEME
+    global SHAPE_SOURCE
+    global MAIN_MESSAGE_PT, MAIN_MESSAGE_BOLD, CHART_TITLE_PT, CHART_TITLE_BOLD, SOURCE_PT
+    global SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H
+    global COLOR_TEXT, COLOR_SOURCE, FONT_NAME_JP
+    global CELL_BG_EVEN, CELL_BG_ODD
+
+    _THEME = theme
+
+    SOURCE_X = theme.layout("source_x_in")
+    SOURCE_Y = theme.layout("source_y_in")
+    SOURCE_W = theme.layout("source_w_in")
+    SOURCE_H = theme.layout("source_h_in")
+
+    COLOR_TEXT = theme.color("text")
+    COLOR_SOURCE = theme.color("source")
+    FONT_NAME_JP = theme.font_ea
+
+    if theme.id == "stellar_aiz":
+        SHAPE_SOURCE = "Source"
+        MAIN_MESSAGE_PT = 26
+        MAIN_MESSAGE_BOLD = True
+        CHART_TITLE_PT = 18
+        CHART_TITLE_BOLD = True
+        SOURCE_PT = 10
+        CELL_BG_EVEN = "F0F1F5"
+        CELL_BG_ODD = "FFFFFF"
+    else:
+        SHAPE_SOURCE = "Source 3"
+        # Roleup C4 allowed set: {22, 14, 12, 10, 6}
+        MAIN_MESSAGE_PT = theme.pt_value("font_size_title_pt")  # 22
+        MAIN_MESSAGE_BOLD = False
+        CHART_TITLE_PT = theme.pt_value("font_size_subtitle_pt")  # 12
+        CHART_TITLE_BOLD = False
+        SOURCE_PT = theme.pt_value("font_size_source_pt")  # 6
+        # Cell background uses brand label_bg / white (banded rows for readability).
+        CELL_BG_EVEN = theme.hex_no_hash("label_bg").upper()
+        CELL_BG_ODD = "FFFFFF"
+
+
+def _silent_remove_shape(slide, shape_name):
+    for s in list(slide.shapes):
+        if s.name == shape_name:
+            sp = s._element
+            sp.getparent().remove(sp)
 
 
 def find_shape(slide, name):
@@ -92,7 +170,7 @@ def find_shape(slide, name):
 
 
 def set_textbox_text(shape, text, font_size=None, bold=None):
-    """TextBox/Placeholderのテキストを設定。font_size(pt)/boldを指定するとrPrに明示的に書き込む。"""
+    """Set textbox text. Optionally pin font_size(pt)/bold via rPr/@sz/@b."""
     if shape is None:
         return
     tf = shape.text_frame
@@ -122,10 +200,28 @@ def set_textbox_text(shape, text, font_size=None, bold=None):
         t_elem.text = text
 
 
+def add_dynamic_source_textbox(slide, text):
+    """Fallback: dynamic textbox for source when no Source/Source 3 placeholder is present."""
+    tb = slide.shapes.add_textbox(SOURCE_X, SOURCE_Y, SOURCE_W, SOURCE_H)
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.margin_left = 0; tf.margin_right = 0
+    tf.margin_top = 0; tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.LEFT
+    run = p.add_run()
+    run.text = text
+    run.font.size = Pt(SOURCE_PT)
+    run.font.color.rgb = COLOR_SOURCE
+    run.font.name = FONT_NAME_JP
+
+
 def rebuild_table(slide, items):
-    """
-    テンプレートのテーブルを削除し、itemsに応じた行数でネイティブテーブルを再構築する。
-    items: [{"label": "商号", "value": "株式会社〇〇"}, ...]
+    """Drop the template's placeholder Overview Table and rebuild with `items` rows.
+
+    Cell rPr is copied from the template's first row, so brand-specific font
+    (Yu Gothic UI 10pt for roleup, Meiryo UI 14pt for stella) flows through
+    automatically as long as the template's first row has those rPr values.
     """
     table_shape = find_shape(slide, SHAPE_TABLE)
     if table_shape is None:
@@ -134,7 +230,7 @@ def rebuild_table(slide, items):
 
     old_table = table_shape.table
 
-    # テンプレートからセルスタイル（tcPr）とフォントスタイル（rPr）をコピー
+    # Copy first row's tcPr / rPr templates from each column.
     label_tcPr = copy.deepcopy(old_table.cell(0, 0)._tc.find(qn("a:tcPr")))
     value_tcPr = copy.deepcopy(old_table.cell(0, 1)._tc.find(qn("a:tcPr")))
     label_rPr = None
@@ -150,21 +246,17 @@ def rebuild_table(slide, items):
             break
         break
 
-    # 位置・サイズを保存
     tbl_left   = table_shape.left
     tbl_top    = table_shape.top
     tbl_width  = table_shape.width
     tbl_height = table_shape.height
 
-    # 列幅を保存
     old_col0_width = old_table.columns[0].width
     old_col1_width = old_table.columns[1].width
 
-    # 既存テーブルを削除
     sp_tree = slide.shapes._spTree
     sp_tree.remove(table_shape._element)
 
-    # 新テーブルを作成
     n_rows = len(items)
     n_cols = 2
 
@@ -174,11 +266,10 @@ def rebuild_table(slide, items):
     new_shape.name = SHAPE_TABLE
     new_table = new_shape.table
 
-    # 列幅を復元
     new_table.columns[0].width = old_col0_width
     new_table.columns[1].width = old_col1_width
 
-    # tblPr設定（bandRow有効）
+    # tblPr: bandRow on
     ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
     tbl_elem = new_shape._element.find('.//a:tbl', ns)
     old_tblPr = tbl_elem.find('a:tblPr', ns)
@@ -187,8 +278,7 @@ def rebuild_table(slide, items):
     tblPr = etree.SubElement(tbl_elem, qn('a:tblPr'), attrib={'bandRow': '1'})
     tbl_elem.insert(0, tblPr)
 
-    def apply_cell(cell, text, tcPr_tmpl, rPr_tmpl, is_even_row=True):
-        """セルにテキストとスタイルを適用"""
+    def apply_cell(cell, text, tcPr_tmpl, rPr_tmpl, is_even_row=True, is_label_col=True):
         tc = cell._tc
         txBody = tc.find(qn("a:txBody"))
         if txBody is None:
@@ -196,11 +286,9 @@ def rebuild_table(slide, items):
             etree.SubElement(txBody, qn("a:bodyPr"))
             etree.SubElement(txBody, qn("a:lstStyle"))
 
-        # 既存段落を削除
         for p in txBody.findall(qn("a:p")):
             txBody.remove(p)
 
-        # 改行対応: \n で分割して複数段落に
         lines = str(text).split("\n")
         for line in lines:
             p_elem = etree.SubElement(txBody, qn("a:p"))
@@ -216,56 +304,49 @@ def rebuild_table(slide, items):
             t_elem = etree.SubElement(r_elem, qn("a:t"))
             t_elem.text = line
 
-        # セルスタイル適用
         old_tc = tc.find(qn("a:tcPr"))
         if old_tc is not None:
             tc.remove(old_tc)
         if tcPr_tmpl is not None:
             new_tcPr = copy.deepcopy(tcPr_tmpl)
-            # 行ごとの背景色切り替え
-            bg_color = "F0F1F5" if is_even_row else "FFFFFF"
+            bg_color = CELL_BG_EVEN if is_even_row else CELL_BG_ODD
             for old_fill in new_tcPr.findall(qn("a:solidFill")):
                 new_tcPr.remove(old_fill)
             sf = etree.SubElement(new_tcPr, qn("a:solidFill"))
             etree.SubElement(sf, qn("a:srgbClr"), attrib={"val": bg_color})
             tc.append(new_tcPr)
 
-        # 垂直中央揃え
         tcPr_final = tc.find(qn("a:tcPr"))
         if tcPr_final is not None:
             tcPr_final.set("anchor", "ctr")
 
-    # データ行を挿入
     for r_idx, item in enumerate(items):
         label = item.get("label", "")
         value = item.get("value", "")
         is_even = (r_idx % 2 == 0)
 
-        apply_cell(new_table.cell(r_idx, 0), label, label_tcPr, label_rPr, is_even)
-        apply_cell(new_table.cell(r_idx, 1), value, value_tcPr, value_rPr, is_even)
+        apply_cell(new_table.cell(r_idx, 0), label, label_tcPr, label_rPr, is_even, True)
+        apply_cell(new_table.cell(r_idx, 1), value, value_tcPr, value_rPr, is_even, False)
 
     print(f"  ✓ Table rebuilt: {n_rows} rows x {n_cols} cols")
 
 
 def insert_photo(slide, photo_info, area_shape_name, caption_shape_name):
-    """写真をエリアに挿入、キャプションを更新"""
+    """Update caption + insert image into the photo area (if path exists)."""
     if not photo_info:
         return
 
-    # キャプション更新
     caption = photo_info.get("caption", "")
     if caption:
         cap_shape = find_shape(slide, caption_shape_name)
         if cap_shape:
             set_textbox_text(cap_shape, caption)
 
-    # 画像ファイルパスの取得
     img_path = photo_info.get("url") or photo_info.get("path", "")
     if not img_path or not os.path.exists(img_path):
         print(f"  ℹ No image for {caption_shape_name} (placeholder retained)")
         return
 
-    # 画像エリアの位置・サイズを取得
     area_shape = find_shape(slide, area_shape_name)
     if area_shape is None:
         return
@@ -275,7 +356,6 @@ def insert_photo(slide, photo_info, area_shape_name, caption_shape_name):
     width = area_shape.width
     height = area_shape.height
 
-    # 画像を挿入（エリアを覆う）
     slide.shapes.add_picture(img_path, left, top, width, height)
     print(f"  ✓ Photo inserted: {img_path}")
 
@@ -283,57 +363,88 @@ def insert_photo(slide, photo_info, area_shape_name, caption_shape_name):
 def main():
     parser = argparse.ArgumentParser(description="会社概要スライド生成（ネイティブテーブル方式）")
     parser.add_argument("--data", required=True, help="JSONデータファイルパス")
-    parser.add_argument("--template", required=True, help="PPTXテンプレートパス")
+    parser.add_argument(
+        "--template", required=False, default=None,
+        help="Optional explicit template path. If omitted, resolved from --brand "
+             "(via brand_resolver.template_path).",
+    )
     parser.add_argument("--output", required=True, help="出力PPTXファイルパス")
-    add_brand_arg(parser)  # passive: accepted but ignored until brand migration
+    add_brand_arg(parser)
     args = parser.parse_args()
+
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    template_path = args.template or theme.template_path(SKILL_DIR, "company-overview")
+    print(f"=== 会社概要スライド生成（brand={theme.id}）===")
+    print(f"  ✓ Template: {template_path}")
 
     with open(args.data, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    print("=== 会社概要スライド生成（ネイティブテーブル方式） ===")
+    require_source(data, theme, skill_id=SKILL_ID)
 
-    prs = Presentation(args.template)
+    prs = Presentation(template_path)
     slide = prs.slides[0]
 
-    # Shape一覧（デバッグ用）
-    for s in slide.shapes:
-        print(f"  Shape: '{s.name}' type={s.shape_type}")
+    # Roleup: silently remove brown guide rectangles from cp-roleup-derived template.
+    _silent_remove_shape(slide, "正方形/長方形 1")
+    _silent_remove_shape(slide, "正方形/長方形 8")
 
-    # 1. Main Message（Title 1 = 上段太字、最大65文字）
-    main_msg = data.get("main_message", "")
-    if len(main_msg) > 65:
-        print(f"  ⚠ WARNING: Main Message が{len(main_msg)}文字です（上限65文字）。スライドに収まらない可能性があります。", file=sys.stderr)
-    set_textbox_text(find_shape(slide, SHAPE_MAIN_MESSAGE), main_msg, font_size=26, bold=True)
-    print(f"  [Main Message] ({len(main_msg)}文字) {main_msg}")
+    # Title 1 / Text Placeholder 2 — brand-aware top/subtitle assignment.
+    main_msg = resolve_top_text(data, theme)
+    sub_text = resolve_subtitle_text(data, theme) or "対象会社概要：会社概要"
 
-    # 2. Chart Title（Text Placeholder 2 = 下段、10〜20文字）
-    title_text = data.get("title", "対象会社概要：会社概要")
-    if len(title_text) > 20:
-        print(f"  ⚠ WARNING: Chart Title が{len(title_text)}文字です（推奨10〜20文字）。", file=sys.stderr)
-    set_textbox_text(find_shape(slide, SHAPE_CHART_TITLE), title_text, font_size=18, bold=True)
-    print(f"  [Chart Title]  ({len(title_text)}文字) {title_text}")
+    # data field semantics for company-overview-v2:
+    #   stella: 'main_message' = 結論文 → Title 1, 'title' = 見出し → Text Placeholder 2
+    #   roleup: 'title' (chart_title 相当) = スライドタイトル → Title 1,
+    #           'main_message' = 結論文 → Text Placeholder 2
+    # resolve_top_text reads theme.top_placeholder_field() which is
+    # 'main_message' for stella and 'chart_title' for roleup. company-overview-v2
+    # data uses 'title' instead of 'chart_title', so fall back when 'chart_title'
+    # is missing.
+    if theme.id != "stellar_aiz" and not data.get("chart_title"):
+        # Roleup: top placeholder = 'chart_title', but data has 'title' instead.
+        main_msg = data.get("title", "対象会社概要：会社概要")
+        sub_text = data.get("main_message", "")
 
-    # 3. 出典
+    # main_message length warning (kept from V1, applies to whichever field is the 結論文).
+    msg_for_check = data.get("main_message", "")
+    if len(msg_for_check) > 65:
+        print(f"  ⚠ WARNING: main_message {len(msg_for_check)} 字 > 65 字。スライドに収まらない可能性があります。", file=sys.stderr)
+
+    set_textbox_text(
+        find_shape(slide, SHAPE_MAIN_MESSAGE), main_msg,
+        font_size=MAIN_MESSAGE_PT, bold=MAIN_MESSAGE_BOLD,
+    )
+    print(f"  [Title 1] ({len(main_msg)}文字, {MAIN_MESSAGE_PT}pt) {main_msg[:50]}")
+
+    set_textbox_text(
+        find_shape(slide, SHAPE_CHART_TITLE), sub_text,
+        font_size=CHART_TITLE_PT, bold=CHART_TITLE_BOLD,
+    )
+    print(f"  [Text Placeholder 2] ({len(sub_text)}文字, {CHART_TITLE_PT}pt) {sub_text[:50]}")
+
+    # Source: stella prefixes "出典：", roleup uses Source 3 placeholder.
     source_text = data.get("source", "")
-    source_shape = find_shape(slide, SHAPE_SOURCE)
     if source_text:
-        set_textbox_text(source_shape, f"出典：{source_text}")
-    else:
-        set_textbox_text(source_shape, "")
-    print(f"  [Source]        {source_text}")
+        body = source_text if source_text.startswith("出典") else f"出典：{source_text}"
+        source_shape = find_shape(slide, SHAPE_SOURCE)
+        if source_shape is not None:
+            set_textbox_text(source_shape, body, font_size=SOURCE_PT)
+        else:
+            add_dynamic_source_textbox(slide, body)
+        print(f"  [Source]        {body[:50]}")
 
-    # 4. ネイティブテーブル
+    # Overview Table
     items = data.get("items", [])
     if items:
         rebuild_table(slide, items)
 
-    # 5. 写真
+    # Photos
     photos = data.get("photos", {})
     insert_photo(slide, photos.get("headquarters"), SHAPE_PHOTO_1, SHAPE_CAPTION_1)
     insert_photo(slide, photos.get("product"), SHAPE_PHOTO_2, SHAPE_CAPTION_2)
 
-    # 保存
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     prs.save(args.output)
     _finalize_pptx(args.output)
