@@ -647,6 +647,9 @@ add_brand_arg(<parser_var>)  # passive: accepted but ignored until brand migrati
 | 11 | `sales-by-customer-pptx` | ✅ 完了 | A (テーブル N 個横並び、期数別動的フォント vs roleup 固定 10pt) | (next commit)(2026-05-06) |
 | 12 | `valuation-summary-pptx` | ✅ 完了 | A (3 chart_type: football_field / equity_bridge / financial_summary) | (next commit)(2026-05-06) |
 | 13 | `scenario-forecast-pptx` | ✅ 完了 | A (Base/Up/Down 折れ線 ×2 並列、シリーズ + 期間種別凡例) | (next commit)(2026-05-06) |
+| 14 | `business-model-pptx` | ✅ 完了 | C (HTML→Playwright、CSS 変数注入 + curated roleup テンプレ生成) | (next commit)(2026-05-06) |
+| 15 | `customer-sales-detail-pptx` | ✅ 完了 | C (HTML→Playwright、CSS 変数注入 + curated roleup テンプレ生成) | (next commit)(2026-05-06) |
+| 16 | `current-period-forecast-pptx` | ✅ 完了 | C (HTML→Playwright、CSS 変数注入 + curated roleup テンプレ生成、テンプレ命名統一) | (next commit)(2026-05-06) |
 
 ### market-overview-agent × roleup フルネイティブ達成（2026-05-05）
 
@@ -708,6 +711,19 @@ roleup ネイティブで生成可能に。
 - Pattern A BDD 系 4 件追加完了 (business-overview / sales-by-customer / valuation-summary / scenario-forecast)
 - valuation-summary は副次的に Phase 1.5 AST migration で混入していた `import os` 抜けバグも修正
 - 残 Pattern C 系 3 件 (business-model / customer-sales-detail / current-period-forecast)
+
+**Pattern C 3 件完了 (2026-05-06、後続セッション)**:
+- 累積 27 PPTX × 230 checks 全 PASS (24 → +3 PPTX × +24 checks)
+- 各スキルに `scripts/build_roleup_template.py` (one-shot generator) を新設し、
+  stella テンプレ → A4 横 + Yu Gothic UI + 茶系 + Source 3 placeholder の curated roleup テンプレを生成
+- HTML CSS 変数を theme.json から注入する Pattern C 規約を確立（`_apply_theme(theme)` で
+  module-level *_HEX 文字列を上書き → CSS f-string で参照）
+- Title/Subtitle/Source の placeholder text には `_make_brand_run` でフォントサイズと色を明示注入
+  (LibreOffice roundtrip 後の placeholder rename "Title 1"→"PlaceHolder 1" にも fallback で対応)
+- Content Area 装飾矩形は picture 挿入後 `_silent_remove_shape` で削除し C1 PASS を担保
+- current-period-forecast はテンプレ命名 `forecast-template.pptx` →
+  `current-period-forecast-template.pptx` へ統一 (`brand_resolver.template_path()` 規約に揃える)
+- 全 fill が `--brand stellar_aiz / roleup` で完走、SKILL.md `supported_brands: [stellar_aiz, roleup]`
 
 **company-deepdive-agent × roleup E2E**: 3 fill 完了したので次々セッションで実施可能。
 N=1 (二幸産業) work dir があれば流用、なければ簡易 E2E driver を整備して回す。
