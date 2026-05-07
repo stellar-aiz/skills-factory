@@ -14,7 +14,7 @@ description: >
   - BDD（ビジネスDD）の文脈で売上・利益の成長要因を分解する分析を求められた場合
   - 「なぜ売上/利益が変化したか」を要因分解で示したい要望
   - ユーザーが財務データ・決算説明会資料を貼り付けて、要因分解スライド化を求めた場合
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -162,11 +162,20 @@ supported_brands: [stellar_aiz]
 ```bash
 pip install python-pptx -q --break-system-packages
 
+# stella (default, 16:9)
 python <SKILL_DIR>/scripts/fill_growth_driver.py \
   --data {{WORK_DIR}}/growth_driver_data.json \
-  --template <SKILL_DIR>/assets/growth-driver-pptx-template.pptx \
-  --output {{OUTPUT_DIR}}/GrowthDriver_output.pptx
+  --output {{OUTPUT_DIR}}/GrowthDriver_output.pptx \
+  --brand stellar_aiz
+
+# roleup (A4 横, 茶系)
+python <SKILL_DIR>/scripts/fill_growth_driver.py \
+  --data {{WORK_DIR}}/growth_driver_data.json \
+  --output {{OUTPUT_DIR}}/GrowthDriver_output.pptx \
+  --brand roleup
 ```
+
+`--brand roleup` 指定時は `data.source` が必須（`require_source` でハードフェイル）。
 
 ---
 
@@ -174,14 +183,16 @@ python <SKILL_DIR>/scripts/fill_growth_driver.py \
 
 ### 色
 
-| 要素 | カラーコード |
-|---|---|
-| 始点・終点バー（合計） | #2E4A6B（紺） |
-| 正の要因バー | #1B7A3B（緑） |
-| 負の要因バー | #C03A3A（赤） |
-| ドロップライン | #999999（グレー破線） |
-| 右パネル背景 | #FAFAFA |
-| 右パネル枠線 | #DDDDDD |
+| 要素 | stella | roleup |
+|---|---|---|
+| 始点・終点バー（合計） | #2E4A6B（紺） | #604C3F（茶こげ、brand 一貫性） |
+| 正の要因バー | #1B7A3B（緑） | #1B7A3B（緑、universal indicator） |
+| 負の要因バー | #C03A3A（赤） | #C03A3A（赤、universal indicator） |
+| ドロップライン | #999999（グレー破線） | #999999（同） |
+| 右パネル背景 | #FAFAFA | #F2E8DD（label_bg） |
+| 右パネル枠線 | #DDDDDD | #CDCECE（chart_palette[7]） |
+
+POSITIVE/NEGATIVE は ウォーターフォール定番の universal indicator (信号色) として両 brand で同色を維持する。
 
 ### フォントサイズ
 
@@ -211,8 +222,10 @@ python <SKILL_DIR>/scripts/fill_growth_driver.py \
 
 | ファイル | 用途 |
 |---|---|
-| `assets/growth-driver-pptx-template.pptx` | スライドテンプレート |
-| `scripts/fill_growth_driver.py` | 生成スクリプト |
+| `assets/stellar_aiz/growth-driver-template.pptx` | stella ブランド用スライドテンプレート (16:9, Meiryo UI) |
+| `assets/roleup/growth-driver-template.pptx` | roleup ブランド用スライドテンプレート (A4 横, Yu Gothic UI, Source 3 placeholder 付) |
+| `scripts/fill_growth_driver.py` | 生成スクリプト (`--brand` 切替対応) |
+| `scripts/build_roleup_template.py` | stella → roleup テンプレ派生生成ワンショット |
 | `references/sample_data.json` | サンプル（FY2023→FY2024の売上ブリッジ例） |
 
 ---

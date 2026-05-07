@@ -12,7 +12,7 @@ description: >
   - ユーザーが議事録・文字起こしを貼り付けて、データの比較・一覧をテーブル形式でスライド化を求めた場合
   - 既にテーブル形式で整理されたデータが提示され、PowerPoint化を求められた場合
   - 「拠点比較」「製品比較」「KPI一覧」「スコアカード」「ベンチマーク」をテーブルスライドにしたいという要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -123,20 +123,17 @@ supported_brands: [stellar_aiz]
 
 ### テンプレートの参照
 
-テンプレートは `assets/table-chart-template.pptx` を使用する。
+テンプレートは brand 別に格納されている：
 
 ```bash
-TEMPLATE="<SKILL_DIR>/assets/table-chart-template.pptx"
+# stella (16:9, 13.33×7.50 in)
+TEMPLATE="<SKILL_DIR>/assets/stellar_aiz/table-chart-template.pptx"
+
+# roleup (A4 横, 11.69×8.27 in, Yu Gothic UI, 茶系)
+TEMPLATE="<SKILL_DIR>/assets/roleup/table-chart-template.pptx"
 ```
 
-`<SKILL_DIR>` はこのスキルがインストールされたディレクトリパスに置き換えること。
-
-テンプレートを初めて使う前に、以下で構造を確認すること：
-
-```bash
-pip install "markitdown[pptx]" python-pptx -q --break-system-packages
-python -m markitdown <SKILL_DIR>/assets/table-chart-template.pptx
-```
+`--template` を省略した場合は `--brand` から自動解決される（推奨）。
 
 テンプレートのShape名は実際に確認してからマッピングすること。`references/template-mapping.md` に確認後の対応表を記載する。
 
@@ -177,11 +174,20 @@ python -m markitdown <SKILL_DIR>/assets/table-chart-template.pptx
 ### スクリプト実行コマンド
 
 ```bash
+# stella (default, 16:9)
 python <SKILL_DIR>/scripts/fill_table_chart.py \
   --data {{WORK_DIR}}/table_chart_data.json \
-  --template <SKILL_DIR>/assets/table-chart-template.pptx \
-  --output {{OUTPUT_DIR}}/TableChart_output.pptx
+  --output {{OUTPUT_DIR}}/TableChart_output.pptx \
+  --brand stellar_aiz
+
+# roleup (A4 横, 茶系)
+python <SKILL_DIR>/scripts/fill_table_chart.py \
+  --data {{WORK_DIR}}/table_chart_data.json \
+  --output {{OUTPUT_DIR}}/TableChart_output.pptx \
+  --brand roleup
 ```
+
+`--brand roleup` 指定時は `data.source` が必須（`require_source` でハードフェイル）。
 
 ### 出力確認
 
@@ -210,13 +216,15 @@ PowerPoint生成後、以下を確認：
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/table-chart-template.pptx` | テーブルチャートスライドテンプレート（確認済み・Shape構造は references/template-mapping.md 参照） |
+| `assets/stellar_aiz/table-chart-template.pptx` | stella ブランド用 (16:9, Meiryo UI) |
+| `assets/roleup/table-chart-template.pptx` | roleup ブランド用 (A4 横, Yu Gothic UI, Source 3 placeholder 付) |
 
 ## スクリプト
 
 | ファイル名 | 用途 |
 |---|---|
-| `scripts/fill_table_chart.py` | table_chart_data.jsonの内容をtable-chart-template.pptxに流し込み、PPTXを出力する。テーブルの行列数を動的に制御する |
+| `scripts/fill_table_chart.py` | table_chart_data.jsonの内容をtable-chart-template.pptxに流し込み、PPTXを出力する。テーブルの行列数を動的に制御する。`--brand` で出力ブランドを切替可能 |
+| `scripts/build_roleup_template.py` | stella テンプレから roleup テンプレを派生生成するワンショットスクリプト (A4 横化 + Yu Gothic UI + Source 3 placeholder 追加) |
 
 ## 参考
 

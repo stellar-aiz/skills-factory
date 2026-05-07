@@ -652,6 +652,26 @@ PROFILES: dict[tuple, list[Callable]] = {
         r for r in _COMMON_ROLEUP_RULES
         if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
     ],
+    ("table-chart-pptx", "roleup"): [
+        # table-chart はネイティブテーブル 1 個 (左ペイン) + Implications textbox (右ペイン) +
+        # Connector (横線) の構成。chart object 不在のため C10/C12 を除外、
+        # 残り 8 ルール (C1/C2/C4/C5/C6/C7/C8/C11) を適用。
+        r for r in _COMMON_ROLEUP_RULES
+        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
+    ],
+    ("issue-risk-list-pptx", "roleup"): [
+        # issue-risk-list は動的 textbox + connector の構成 (テンプレ shape は事前削除)、
+        # chart object 不在のため C10/C12 を除外、残り 8 ルール (C1/C2/C4/C5/C6/C7/C8/C11) を適用。
+        r for r in _COMMON_ROLEUP_RULES
+        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
+    ],
+    ("growth-driver-pptx", "roleup"): [
+        # growth-driver は手描き Rectangle + Connector でウォーターフォールを構成、
+        # chart object 不在のため C10/C12 を除外、残り 8 ルール (C1/C2/C4/C5/C6/C7/C8/C11) を適用。
+        # POSITIVE/NEGATIVE 信号色は universal indicator として両 brand で維持。
+        r for r in _COMMON_ROLEUP_RULES
+        if r not in (rule_chart_axis_font_size, rule_no_chart_builtin_legend)
+    ],
     # stella 版は ISSUE-010 で stella 仕様確定後に追加 (現状 skeleton)
     ("customer-profile-pptx", "stellar_aiz"): [],   # TODO: ISSUE-010
     ("market-environment-pptx", "stellar_aiz"): [], # TODO: ISSUE-010
@@ -685,6 +705,9 @@ PROFILES: dict[tuple, list[Callable]] = {
     ("swot-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
     ("value-chain-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
     ("value-chain-matrix-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("table-chart-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("issue-risk-list-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
+    ("growth-driver-pptx", "stellar_aiz"): [],  # TODO: ISSUE-010
 }
 
 

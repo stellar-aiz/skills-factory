@@ -667,6 +667,9 @@ add_brand_arg(<parser_var>)  # passive: accepted but ignored until brand migrati
 | 19 | `swot-pptx` | ✅ 完了 | A (4 象限 code 動的描画、universal indicator 4 色維持) | `6d17edf`(2026-05-06) |
 | 20 | `value-chain-pptx` | ✅ 完了 | A (シェブロン茶系グラデーション + テンプレ命名統一) | `4cfe93e`(2026-05-06) |
 | 21 | `value-chain-matrix-pptx` | ✅ 完了 | A (Chevron + 4 行マトリクス、Arial→Yu Gothic UI で C8 修正、nested bars sub-stripe 化) | `79ee4c2`(2026-05-06) |
+| 22 | `table-chart-pptx` | ✅ 完了 | A (テーブル系、ヘッダー塗 label_bar 上書き + rPr font 注入) | (next commit)(2026-05-07) |
+| 23 | `issue-risk-list-pptx` | ✅ 完了 | A (動的 textbox + connector、roleup MAX_ROWS=5 + 10pt スケール) | (next commit)(2026-05-07) |
+| 24 | `growth-driver-pptx` | ✅ 完了 | A (ウォーターフォール手描き、TOTAL=#604C3F brand 一貫、POS/NEG=universal indicator 維持) | (next commit)(2026-05-07) |
 
 ### market-overview-agent × roleup フルネイティブ達成（2026-05-05）
 
@@ -696,6 +699,35 @@ market-overview-agent デッキ 12 スライド全てが roleup native 化。
 - executive-summary findings[1].detail 103 → 91 chars
 - pest-analysis main_message 66 → 63 chars
 両 fill は累積 compliance check 対象に復帰した。
+
+### strategy-report-agent × roleup フルネイティブ達成 (2026-05-07)
+
+table-chart / issue-risk-list / growth-driver の 3 fill 完了で、
+`strategy-report-agent` デッキ 23 スライド全てが roleup native 化。
+これにより 3 orchestrator (market-overview / company-deepdive / strategy-report) 全てが
+roleup E2E warning=0 達成。
+
+**E2E 再実行結果** (work/strategy-report-agent/run_e2e.py、八海醸造グループ題材):
+- 23/23 fill 完走 (success rate 100%)
+- `brand_fallback` warning 件数 = **0**
+- `merge_warnings.json` = `[]` (warnings 完全に 0)
+- 出力: `outputs/E2E_StrategyReport_hakkai_roleup_2026-05-07.pptx` (24 slide / A4 横 11.69×8.27 in)
+  - issue-risk-list の自動ページ分割 (data 7 行 / roleup MAX_ROWS=5) で 23+1=24 slide
+- pytest regression 49 passed (warnings 1 件は既存 known)
+
+**副次成果 (data 側 6 件不整合の最小修正)**:
+- `data_01_exec`: findings[1]/[2].detail 130 chars → 78/70 chars に短縮 (上限 100)
+- `data_05_profile` / `data_17_hakkai`: year 'FYNNNN' (str) → NNNN (int) で計 18 件修正 (fiscal_period_format 整合)
+- `data_10_5f` / `data_23_irl`: source 追加 (require_source 必須)
+- `data_12_me`: main_message 69 chars → 51 chars に短縮 (上限 65)
+
+これらは fill scripts のバグではなく、過去に生成済みの work data が roleup 仕様に追従していなかった残骸。
+今後 strategy-report-agent 起動時には web 検索段階で正しい上限を遵守する prompt 制約を確認すべき (Phase 2 後半 task)。
+
+**累積 compliance check (2026-05-07)**: 8 PPTX × 68 checks 全 PASS
+- pilot 3 (customer-profile/market-environment/company-history)
+- 戦略フレーム 2 (value-chain/value-chain-matrix)
+- 新 3 (table-chart/issue-risk-list/growth-driver)
 
 ### BDD トリオ完結 (2026-05-06)
 

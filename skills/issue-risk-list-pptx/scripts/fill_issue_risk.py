@@ -2,16 +2,18 @@
 fill_issue_risk.py — 課題・リスク一覧データをPPTXテンプレートに流し込むスクリプト
 
 複数ページ対応:
-  - 1スライドあたり最大4行（MAX_ROWS_PER_SLIDE、16pt前提）
-  - 5行以上の場合は自動的にスライドを追加してバランス分割
+  - stella: 1スライドあたり最大4行 (16pt前提)、roleup: 5行 (10pt前提)
+  - max_rows 超の場合は自動的にスライドを追加してバランス分割
   - 複数ページ時のChart Titleに「（1/3）」等のページ番号を付与
-  - フォントサイズはデフォルト16pt（JSON側で font_size_header / font_size_data を指定可能）
+  - フォントサイズはデフォルト stella=16pt / roleup=10pt
+    JSON側で font_size_header / font_size_data を指定して上書き可能
 
 使い方:
   python fill_issue_risk.py \
     --data /home/claude/issue_risk_data.json \
-    --template <SKILL_DIR>/assets/issue-risk-template.pptx \
-    --output /mnt/user-data/outputs/IssueRisk_output.pptx
+    [--template <SKILL_DIR>/assets/<brand>/issue-risk-list-template.pptx] \
+    --output /mnt/user-data/outputs/IssueRisk_output.pptx \
+    [--brand stellar_aiz | roleup]
 """
 
 import argparse
@@ -21,13 +23,20 @@ import sys
 import copy
 import math
 
-# brand_resolver bootstrap (passive --brand acceptance until brand-aware migration)
+# brand_resolver bootstrap (Phase 2 — brand-aware: stellar_aiz / roleup)
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(SKILL_DIR, "..", "_common", "lib"))
-from brand_resolver import add_brand_arg  # noqa: E402
+from brand_resolver import resolve_brand, add_brand_arg  # noqa: E402
+from format_helpers import resolve_top_text, resolve_subtitle_text, require_source  # noqa: E402
 from validate_fill_input import validate_fill_input  # noqa: E402
+
+SKILL_ID = "issue-risk-list-pptx"
+_THEME = None
+
 from pptx import Presentation
-from pptx.util import Pt, Emu
+from pptx.util import Pt, Emu, Inches
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 from pptx.oxml.ns import qn
 from lxml import etree
 
@@ -65,24 +74,33 @@ def _finalize_pptx(path):
         pass
 
 
-# ── レイアウト定数 ──────────────────────────────────────────
-MARGIN_LEFT    = 370800
-CONTENT_WIDTH  = 11616153
-HEADER_TOP     = 1425630
-HEADER_HEIGHT  = 500000
-HEADER_SEP_TOP = 1930000
-FIRST_ROW_TOP  = 2050000
-ROW_HEIGHT     = 900000
-ROW_SPACING    = 1100000
+# ── レイアウト定数 (stella defaults; _apply_theme で roleup 用に上書き) ──
+MARGIN_LEFT    = 370800       # ≈0.41 in
+CONTENT_WIDTH  = 11616153     # ≈12.70 in
+HEADER_TOP     = 1425630      # ≈1.56 in
+HEADER_HEIGHT  = 500000       # ≈0.55 in
+HEADER_SEP_TOP = 1930000      # ≈2.11 in
+FIRST_ROW_TOP  = 2050000      # ≈2.24 in
+ROW_HEIGHT     = 900000       # ≈0.98 in
+ROW_SPACING    = 1100000      # ≈1.20 in
 
 MAX_ROWS_PER_SLIDE = 4
 
-# ── フォントサイズデフォルト（16pt = 1600） ──
+# ── フォントサイズデフォルト (stella: 16pt, roleup: 10pt) ──
 DEFAULT_HEADER_FONT_SIZE = 1600
 DEFAULT_DATA_FONT_SIZE   = 1600
 
+# ── 出典 (Source) ──
+SOURCE_X = Inches(0.41)
+SOURCE_Y = Inches(7.05)
+SOURCE_W = Inches(12.50)
+COLOR_SOURCE = RGBColor(0x66, 0x66, 0x66)
+FONT_NAME_JP = None  # None: テンプレ default 継承
+FONT_SIZE_SOURCE = Pt(10)
+
 SHAPE_MAIN_MESSAGE = "Title 1"
 SHAPE_CHART_TITLE  = "Text Placeholder 2"
+SHAPE_SOURCE_PH    = "Source 3"  # roleup placeholder
 
 REMOVE_NAMES = {
     "TextBox 4", "TextBox 5", "TextBox 23", "TextBox 25", "TextBox 26",
@@ -91,6 +109,45 @@ REMOVE_NAMES = {
     "Straight Connector 7", "Straight Connector 51",
     "Straight Connector 63", "Straight Connector 70", "Straight Connector 77",
 }
+
+
+def _apply_theme(theme):
+    """roleup の場合、レイアウト・フォントサイズ・出典座標を brand 仕様に上書きする。"""
+    global MARGIN_LEFT, CONTENT_WIDTH, HEADER_TOP, HEADER_HEIGHT, HEADER_SEP_TOP
+    global FIRST_ROW_TOP, ROW_HEIGHT, ROW_SPACING, MAX_ROWS_PER_SLIDE
+    global DEFAULT_HEADER_FONT_SIZE, DEFAULT_DATA_FONT_SIZE
+    global SOURCE_X, SOURCE_Y, SOURCE_W, COLOR_SOURCE
+    global FONT_NAME_JP, FONT_SIZE_SOURCE
+    global _THEME
+    _THEME = theme
+
+    if theme.id != "roleup":
+        return
+
+    # A4 横 (11.69 × 8.27) 用にスケール
+    MARGIN_LEFT    = int(Inches(0.41))
+    CONTENT_WIDTH  = int(Inches(10.87))
+    HEADER_TOP     = int(Inches(1.55))
+    HEADER_HEIGHT  = int(Inches(0.40))
+    HEADER_SEP_TOP = int(Inches(1.95))
+    FIRST_ROW_TOP  = int(Inches(2.05))
+    ROW_HEIGHT     = int(Inches(0.55))
+    ROW_SPACING    = int(Inches(0.95))
+
+    # 10pt + 行間 0.95 in: 5 行 = 約 4.75 in (available ≈ 5.40 in)
+    MAX_ROWS_PER_SLIDE = 5
+
+    # roleup C4 許容集合 [22, 14, 12, 10, 6] pt
+    DEFAULT_HEADER_FONT_SIZE = 1000
+    DEFAULT_DATA_FONT_SIZE   = 1000
+
+    SOURCE_X = Inches(0.41)
+    SOURCE_Y = Inches(7.45)
+    SOURCE_W = Inches(10.87)
+
+    COLOR_SOURCE = theme.color("source")
+    FONT_NAME_JP = theme.font_ea or "Yu Gothic UI"
+    FONT_SIZE_SOURCE = Pt(int(theme._defaults.get("font_size_source_pt", 6)))
 
 
 def find_shape(slide, name):
@@ -161,7 +218,12 @@ def add_textbox(slide, left, top, width, height, text, font_size=1100,
     if bold:
         rPr_attrib["b"] = "1"
     rPr = etree.SubElement(r, qn("a:rPr"), attrib=rPr_attrib)
-    etree.SubElement(rPr, qn("a:latin"), attrib={"typeface": "+mn-ea"})
+    # roleup: 明示的に Yu Gothic UI を注入 / stella: テンプレ default 継承 (+mn-ea)
+    if FONT_NAME_JP:
+        etree.SubElement(rPr, qn("a:latin"), attrib={"typeface": FONT_NAME_JP})
+        etree.SubElement(rPr, qn("a:ea"), attrib={"typeface": FONT_NAME_JP})
+    else:
+        etree.SubElement(rPr, qn("a:latin"), attrib={"typeface": "+mn-ea"})
 
     t = etree.SubElement(r, qn("a:t"))
     t.text = text
@@ -309,12 +371,54 @@ def split_rows_balanced(all_rows, max_per_page):
     return [c for c in chunks if c] or [[]]
 
 
+def write_source(slide, source):
+    """出典を Source 3 placeholder (roleup) または dynamic textbox (stella) に書き込む。"""
+    if not source:
+        return
+
+    if _THEME is not None and _THEME.is_source_required():
+        src_shape = find_shape(slide, SHAPE_SOURCE_PH)
+        if src_shape is not None:
+            tf = src_shape.text_frame
+            para = tf.paragraphs[0]
+            if para.runs:
+                para.runs[0].text = f"出典: {source}"
+                for run in para.runs[1:]:
+                    run.text = ""
+            else:
+                r_elem = etree.SubElement(para._p, qn("a:r"))
+                etree.SubElement(r_elem, qn("a:rPr"), attrib={"lang": "ja-JP"})
+                t_elem = etree.SubElement(r_elem, qn("a:t"))
+                t_elem.text = f"出典: {source}"
+            for para in tf.paragraphs:
+                for run in para.runs:
+                    run.font.size = FONT_SIZE_SOURCE
+                    run.font.color.rgb = COLOR_SOURCE
+                    if FONT_NAME_JP:
+                        run.font.name = FONT_NAME_JP
+            return
+
+    # stella: 動的 textbox
+    tb = slide.shapes.add_textbox(SOURCE_X, SOURCE_Y, SOURCE_W, Inches(0.30))
+    tf = tb.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.LEFT
+    run = p.add_run()
+    run.text = f"出典: {source}"
+    run.font.size = FONT_SIZE_SOURCE
+    run.font.color.rgb = COLOR_SOURCE
+    if FONT_NAME_JP:
+        run.font.name = FONT_NAME_JP
+
+
 def main():
     parser = argparse.ArgumentParser(description="課題・リスク一覧データをPPTXに流し込む")
     parser.add_argument("--data",     required=True)
-    parser.add_argument("--template", required=True)
+    parser.add_argument("--template", required=False, default=None,
+                        help="issue-risk-list-template.pptx のパス (省略時は --brand から自動解決)")
     parser.add_argument("--output",   required=True)
-    add_brand_arg(parser)  # passive: accepted but ignored until brand migration
+    add_brand_arg(parser)
     args = parser.parse_args()
 
     with open(args.data, "r", encoding="utf-8") as f:
@@ -324,9 +428,19 @@ def main():
     validate_fill_input(
         data,
         required_top=["main_message", "rows"],
-        allowed_top=["main_message", "chart_title", "rows", "columns"],
-        skill_name="issue-risk-list-pptx",
+        allowed_top=[
+            "main_message", "chart_title", "rows", "columns",
+            "font_size_header", "font_size_data",
+            "source", "source_label", "source_text",
+        ],
+        skill_name=SKILL_ID,
     )
+
+    # Phase 2: brand-aware
+    theme = resolve_brand(args.brand, SKILL_DIR)
+    _apply_theme(theme)
+    require_source(data, theme, skill_id=SKILL_ID)
+    template_path = args.template or theme.template_path(SKILL_DIR, "issue-risk-list")
 
     _main_msg = data.get("main_message", "")
     if len(_main_msg) > 70:
@@ -336,10 +450,10 @@ def main():
             file=sys.stderr,
         )
 
-    prs = Presentation(args.template)
+    prs = Presentation(template_path)
 
-    main_msg    = data.get("main_message", "").strip()
-    chart_title = data.get("chart_title", "").strip()
+    main_msg    = resolve_top_text(data, theme).strip()
+    chart_title = resolve_subtitle_text(data, theme).strip()
     columns     = data.get("columns", [])
     all_rows    = data.get("rows", [])
 
@@ -347,11 +461,11 @@ def main():
         print("  ERROR: columns is empty", file=sys.stderr)
         sys.exit(1)
     if not main_msg:
-        print("  WARNING: main_message is empty", file=sys.stderr)
+        print("  WARNING: top text is empty", file=sys.stderr)
     if not chart_title:
-        print("  WARNING: chart_title is empty", file=sys.stderr)
+        print("  WARNING: subtitle is empty", file=sys.stderr)
 
-    # フォントサイズはJSON側で上書き可能（単位: 百分の一pt、16pt = 1600）
+    # フォントサイズはJSON側で上書き可能（単位: 百分の一pt）
     header_font_size = int(data.get("font_size_header", DEFAULT_HEADER_FONT_SIZE))
     data_font_size   = int(data.get("font_size_data",   DEFAULT_DATA_FONT_SIZE))
 
@@ -396,6 +510,14 @@ def main():
             header_font_size=header_font_size, data_font_size=data_font_size,
         )
         cumulative += len(row_chunks[page_idx + 1])
+
+    # ── Source (全ページに同じ出典を表示) ──
+    source = (data.get("source") or data.get("source_label")
+              or data.get("source_text") or "").strip()
+    if source:
+        for slide in prs.slides:
+            write_source(slide, source)
+        print(f"  [Source] {source[:60]}{'...' if len(source) > 60 else ''}")
 
     prs.save(args.output)
 

@@ -13,7 +13,7 @@ description: >
   - 既に課題・リスクが整理されたテキストが提示され、PowerPoint化を求められた場合
   - 「課題管理」「リスク管理」「課題トラッキング」「リスクトラッキング」をスライドにしたいという要望
   - 「プロジェクトステータス」の中で課題・リスク部分のスライドを作りたいという要望
-supported_brands: [stellar_aiz]
+supported_brands: [stellar_aiz, roleup]
 
 ---
 
@@ -143,20 +143,17 @@ supported_brands: [stellar_aiz]
 
 ### テンプレートの参照
 
-テンプレートは `assets/issue-risk-template.pptx` を使用する。
+テンプレートは brand 別に格納されている：
 
 ```bash
-TEMPLATE="<SKILL_DIR>/assets/issue-risk-template.pptx"
+# stella (16:9, 13.33×7.50 in)
+TEMPLATE="<SKILL_DIR>/assets/stellar_aiz/issue-risk-list-template.pptx"
+
+# roleup (A4 横, 11.69×8.27 in, Yu Gothic UI, 茶系)
+TEMPLATE="<SKILL_DIR>/assets/roleup/issue-risk-list-template.pptx"
 ```
 
-`<SKILL_DIR>` はこのスキルがインストールされたディレクトリパスに置き換えること。
-
-テンプレートを初めて使う前に、以下で構造を確認すること：
-
-```bash
-pip install "markitdown[pptx]" python-pptx -q --break-system-packages
-python -m markitdown <SKILL_DIR>/assets/issue-risk-template.pptx
-```
+`--template` を省略した場合は `--brand` から自動解決される（推奨）。
 
 ### 課題・リスクデータのJSON化
 
@@ -193,11 +190,20 @@ python -m markitdown <SKILL_DIR>/assets/issue-risk-template.pptx
 ### スクリプト実行コマンド
 
 ```bash
+# stella (default, 16:9)
 python <SKILL_DIR>/scripts/fill_issue_risk.py \
   --data {{WORK_DIR}}/issue_risk_data.json \
-  --template <SKILL_DIR>/assets/issue-risk-template.pptx \
-  --output {{OUTPUT_DIR}}/IssueRisk_output.pptx
+  --output {{OUTPUT_DIR}}/IssueRisk_output.pptx \
+  --brand stellar_aiz
+
+# roleup (A4 横, 茶系, 1スライド最大5行)
+python <SKILL_DIR>/scripts/fill_issue_risk.py \
+  --data {{WORK_DIR}}/issue_risk_data.json \
+  --output {{OUTPUT_DIR}}/IssueRisk_output.pptx \
+  --brand roleup
 ```
+
+`--brand roleup` 指定時は `data.source` が必須（`require_source` でハードフェイル）。
 
 ### 出力確認
 
@@ -227,13 +233,15 @@ PowerPoint生成後、以下を確認：
 
 | ファイル名 | 用途 |
 |---|---|
-| `assets/issue-risk-template.pptx` | 課題・リスク一覧スライドテンプレート（確認済み・Shape構造は references/template-mapping.md 参照） |
+| `assets/stellar_aiz/issue-risk-list-template.pptx` | stella ブランド用 (16:9, Meiryo UI、最大4行/page) |
+| `assets/roleup/issue-risk-list-template.pptx` | roleup ブランド用 (A4 横, Yu Gothic UI, Source 3 placeholder 付、最大5行/page) |
 
 ## スクリプト
 
 | ファイル名 | 用途 |
 |---|---|
-| `scripts/fill_issue_risk.py` | issue_risk_data.jsonの内容をissue-risk-template.pptxに流し込み、PPTXを出力する。列定義と行数を動的に制御し、7行以上は自動ページ分割する |
+| `scripts/fill_issue_risk.py` | issue_risk_data.jsonの内容を issue-risk-list-template.pptx に流し込み、PPTXを出力する。列定義と行数を動的に制御し、最大行数を超える場合は自動ページ分割する。`--brand` で出力ブランドを切替可能 |
+| `scripts/build_roleup_template.py` | stella テンプレから roleup テンプレを派生生成するワンショットスクリプト (A4 横化 + Yu Gothic UI + サンプル行除去 + Source 3 placeholder 追加) |
 
 ## 参考
 
