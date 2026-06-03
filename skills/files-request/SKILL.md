@@ -31,21 +31,16 @@ description: >
 
 ## 引数とビジネスモデル定義
 
-引数 `business-model` は以下の **5 分類に限定**される。
+引数 `business-model` は以下の 5 分類に**限定**される（いずれか必須）:
 
-| id | 名称 | 価値源泉 | ベース IRL ファイル |
-|----|------|----------|----------------------|
-| `stores` | 店舗・拠点型 | 立地と店舗網（小売・飲食・サービス店舗） | `questions-for-stores.xlsx` |
-| `assets` | 資産型 | 設備・資本（製造・不動産・レンタル） | `questions-for-assets.xlsx` |
-| `labors` | 労働型 | 人の稼働・専門性（建設・人材・受託） | `questions-for-labors.xlsx` |
-| `products` | 製品型 | 製品・知財（メーカー・ブランド・SW） | `questions-for-products.xlsx` |
-| `flows` | 仲介・流通型 | 仕入販売スプレッド（卸・商社・代理店・EC） | `questions-for-flows.xlsx` |
+- `stores`（店舗・拠点型）
+- `assets`（資産型）
+- `labors`（労働型）
+- `products`（製品型）
+- `flows`（仲介・流通型）
 
-詳細は `references/business_model_taxonomy.md` を参照。
-
-> **禁止事項**: ビジネスモデルが定義されていない場合に、定義されているかのように振る舞わない。
-> 引数が 5 分類以外、または対応ベース IRL が存在しない場合は、その旨を明示して **停止**する
-> （生成しない）。
+各分類の価値源泉・代表業種・ベース IRL ファイル名、および未定義時の扱い（禁止事項）は、
+**唯一の正本である `references/business_model_taxonomy.md`** を参照。
 
 ## 入出力仕様
 

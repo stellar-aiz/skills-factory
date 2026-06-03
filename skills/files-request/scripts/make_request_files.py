@@ -26,8 +26,8 @@ import shutil
 import sys
 from pathlib import Path
 
-# スキルが正本として定義するビジネスモデル 5 分類。
-# 詳細は references/business_model_taxonomy.md を参照。
+# ビジネスモデル 5 分類の機械的 enum。
+# 唯一の正本は references/business_model_taxonomy.md（ここはそれに従う写し）。
 BUSINESS_MODELS = {
     "stores": "店舗・拠点型",
     "assets": "資産型",

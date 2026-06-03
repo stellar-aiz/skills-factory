@@ -1,5 +1,8 @@
 # ビジネスモデル分類（files-request 正本）
 
+> ※ ビジネスモデル定義はこのファイルが**唯一の正本**。SKILL.md は id 一覧のみを持ち、
+> `scripts/make_request_files.py` の `BUSINESS_MODELS` は機械的 enum としてこれに従う。
+
 `files-request` スキルが扱うビジネスモデルは以下の **5 分類に限定**する。
 引数 `business-model` はこのいずれかでなければならない。
 
