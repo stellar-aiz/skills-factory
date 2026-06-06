@@ -403,6 +403,17 @@ parsed = parse_subagent_return(result)
 `market-share-pptx` / `positioning-map-pptx` / `competitor-summary-pptx` /
 `market-kbf-pptx`（player_examples）すべてで **`scope.json.max_competitors` と同数の同じ社**を採用する（読み手が一貫したストーリーで追えるようにするため）。
 
+### data_07（ポジショニング）の軸選択ゲート（必須）
+
+`data_07_positioning.json` の `x_axis`/`y_axis` を確定する前に、**軸を想像で書かず**、
+positioning-map-pptx の「軸選択ゲート」を必ず通す:
+
+1. 軸候補を **3 案** 根拠付きでユーザーに提示（X軸/Y軸 名称・low/high の意味・なぜプレイヤーが分散するか）
+2. **ユーザーの選択を待つ**
+3. 選択された軸でのみ `x_axis`/`y_axis` と各 `players[].x/y` を確定する
+
+このゲートは market-overview-agent 経由でも省略しない（[Step1 論点4](prompts/step1_research_template.md) 参照）。
+
 ### highlight_company の伝搬（P6/P7/P8 横断）
 
 `scope.json.highlight_company` の値に応じて、Step 1 のデータ生成時に各 JSON へ次のとおり伝搬する。**3 スライドで同じ社を強調することで読み手のストーリーが揃う**。
@@ -552,6 +563,12 @@ strategy-report-agent v5.1 の規約と同じ。番号と最終並び順を一�
 - positioning-map-pptx のみ hard-fail 検証あり（`_common/lib/validate_fill_input.py` 経由）
 - 他 PPTX スキルは silent fail の可能性が残るため、**sample_data.json の事前 Read を絶対省略しない**
 - 想定外キー WARN が stderr に出た場合は必ず修正する（タイポ・古いスキーマ流用のサイン）
+
+> **別 failure mode（軸の想像確定）にも注意**: 上記 ISSUE-012 は「スキーマ齟齬」の silent fail。
+> これとは別に positioning-map では「**2 軸を想像で確定してしまう**」failure mode がある。
+> `data_07_positioning.json` の `x_axis`/`y_axis` は、positioning-map-pptx の
+> 「軸選択ゲート（必須・スキップ不可）」で**ユーザーに軸候補 3 案を提示・選択させた後でのみ**確定する。
+> 詳細は論点4（下記 Step1 リサーチ）と positioning-map-pptx SKILL.md を参照。
 
 ### Step 5 開始前: brand fallback バッファ初期化（必須）
 

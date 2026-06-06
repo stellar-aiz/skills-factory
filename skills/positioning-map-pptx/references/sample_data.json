@@ -27,19 +27,16 @@
   "players": [
     {"name": "対象会社", "x": 4.5, "y": 5.0, "size": 50, "color": "#E15759", "label_position": "bottom"},
     {"name": "テスラ", "x": 8.0, "y": 8.0, "size": 90, "label_position": "left"},
-    {"name": "ポルシェ", "x": 9.0, "y": 9.3, "size": 40, "label_position": "bottom"},
     {"name": "BYD", "x": 5.5, "y": 3.0, "size": 95, "label_position": "bottom"},
     {"name": "VW", "x": 3.5, "y": 5.8, "size": 70, "label_position": "top"},
-    {"name": "現代自動車", "x": 5.5, "y": 4.2, "size": 60, "label_position": "right"},
-    {"name": "日産", "x": 2.5, "y": 4.0, "size": 45, "label_position": "left"},
-    {"name": "リビアン", "x": 7.0, "y": 9.0, "size": 25, "label_position": "top"}
+    {"name": "現代自動車", "x": 5.5, "y": 4.2, "size": 60, "label_position": "right"}
   ],
   "implications_title": "ポジショニングからの示唆",
   "implications": [
     "対象会社は中価格・汎用領域（マップ中央）に位置し、VW・現代自動車と競合密集",
     "テスラは高価格・高専門性でポジション確立、圧倒的な売上規模",
     "BYDは低価格・中専門性で販売台数No.1、価格戦略で対象会社に脅威",
-    "ポルシェ・リビアンはハイエンド・高専門ニッチでプレミアム戦略",
+    "ハイエンド・専門象限はテスラがほぼ独占し、空白の専門ニッチに参入余地あり",
     "対象会社は『高価格・専門特化』象限への移行で差別化余地あり"
   ]
 }

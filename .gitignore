@@ -6,6 +6,9 @@ __pycache__/
 # Template backups created by tools/fix_template_rels.py
 *.bak
 
+# PowerPoint owner-lock temp files (created when a .pptx is open in PowerPoint)
+~$*
+
 # factory workspaces
 inputs/*
 !inputs/.gitkeep
