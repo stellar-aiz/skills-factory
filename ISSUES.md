@@ -1120,3 +1120,45 @@ web 検索段階の prompt（subagent / orchestrator 側）に上記制約を事
 ### 着手判断
 
 prompt 修正だけなら 30〜60 分。次に orchestrator を触るタイミング、または同種事故が再発したら即対応。
+
+---
+
+## ISSUE-017: provenance マニフェスト＋WEB検証レビュワーを全スキル共通規約へ横展開
+
+**Status**: 保留 / **Priority**: P2 / **Decided**: 2026-06-08
+
+### 背景
+positioning-map-pptx で「provenance サイドカー（LLM が取得した全項目＋主張する出典の構造化マニフェスト）を
+入力に、記録 source URL を WebFetch 照合する WEB 検証層」を先行実装した（`build_provenance_trace.py` に
+`verify-prep` モード＋`render --verification`、provenance に `actual_value`/`actual_unit`/`actual_metric` 追加）。
+
+ユーザーの本来の構想は「**LLM が取得する全項目を出力させ、それに対して WEB 再検索でファクトチェックする
+レビュワーが別途ある**」という**全スキル共通の仕組み**。今回は positioning-map 先行のため、横展開は将来課題。
+
+### 現状の分断（横展開で解消したい）
+- provenance サイドカー方式は positioning-map-pptx **固有**（他スキル未採用）。
+- fact-check-reviewer は別系統で生 JSON から正規表現で claim を再抽出し（`extract_claims.py`）、
+  **盲目的に再検索**する方式。LLM が provenance に記録済みの source URL を捨てている。
+- positioning-map の新方式は「記録 URL を先に fetch 照合」するため `source_mismatch`（出典の誤帰属・捏造）を
+  検出でき、fact-check-reviewer の盲目再検索より強い。
+
+### 検討内容（横展開時の設計判断）
+1. provenance サイドカー（`{json_path: {value, actual_value, actual_unit, actual_metric, rationale,
+   source_name, source, confidence}}`）を全 PPTX / orchestrator 共通の規約にするか。
+2. fact-check-reviewer を「provenance-aware」化し、`extract_claims.py` の正規表現抽出に代えて
+   provenance の `actual_value` を一次入力にする（記録 URL fetch 照合を主経路に）。
+3. `verify-prep` 相当の決定論的 worklist 抽出を共通ライブラリ化（各スキルが再実装しない）。
+4. `VERIFY_VOCAB`（confirmed/source_mismatch/source_unreachable/discrepancy/not_found/stale）の語彙統一と
+   fact_check_report.json の severity との対応付け。
+5. ISSUE-002（Web 検索深度の動的制御）と連動：source_mismatch/discrepancy のとき追加検索を発射するか。
+
+### 着手判断
+positioning-map での実運用で `verify-prep`→`render --verification` の価値が確認できたら、
+次に fact-check-reviewer か market-overview-agent を触るタイミングで起票。
+
+### 参考ファイル
+- `skills/positioning-map-pptx/scripts/build_provenance_trace.py`（先行実装・3層モデル）
+- `skills/positioning-map-pptx/SKILL.md`「出典・根拠トレース」「WEB検証フロー」節
+- `skills/positioning-map-pptx/references/sample_verification.json`（worklist 記入例）
+- `skills/fact-check-reviewer/`（横展開時に統合検討する既存レビュワー）
+- `/Users/nakamaru/.claude/plans/fact-check-reviewer-web-llm-web-serene-whisper.md`（本実装の計画書）

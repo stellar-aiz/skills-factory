@@ -151,8 +151,10 @@ BDD（ビジネスデュー・ディリジェンス）・競合分析・市場�
    - 「軸の設計ガイドライン」の組み合わせ例表を候補ソースに使ってよい。
    - **ユーザーの選択（または代案の提示）を待つ**。選択されるまで先へ進まない。
 2. **Step 1: 選択された軸で各社の特徴を抽出**し、x/y/size 値を推計。
+   - **選んだ軸の根拠を provenance に記録**: `$.x_axis` / `$.y_axis` に「なぜこの市場でこの軸か」を `rationale`、出典を `source_name`/`source` に。
+   - **各社の x/y/size を決めたその場で provenance を記録**: ソースを読んで配置を判断した瞬間に、`$.players[i].x` / `.y` / `.size` の `rationale`（なぜこの値か）・`source_name`（出典名）・`source`（URL or 社内ファイル名）・`confidence`（実測/推定/仮置）を埋める。**硬い数値（売上・シェア・海外比率 等）は `actual_value`/`actual_unit`/`actual_metric` にも構造化する**（WEB裏取りの入力になる）。**後でまとめて書こうとせず取得時に書く**（→「出典・根拠トレース」節）。
 3. **Step 2: 推計結果を Markdown でユーザーに提示**（プレビュー）。
-4. **Step 3: ユーザーの承認後**、PowerPoint を生成する。
+4. **Step 3: ユーザーの承認後**、PowerPoint を生成し、続けて provenance トレース表を生成する。
 
 > **市場概要オーケストレーター（market-overview-agent）経由でも本ゲートは省略しない。**
 > オーケストレーターは軸を想像で `data_07_positioning.json` に書き込まず、必ず軸候補 3 案を
@@ -232,6 +234,109 @@ BDD（ビジネスデュー・ディリジェンス）・競合分析・市場�
 | `implications_title` | string | 任意 | 右パネルのタイトル。デフォルト「ポジショニングからの示唆」 |
 | `implications` | array | 任意 | 示唆のブレット項目配列。**固定 5 枠**（`IMPL_1`〜`IMPL_5`）。6 個以上は先頭 5 件のみ表示し stderr に WARN。3〜5 個推奨。1 項目 ≤ 約45全角を目安（固定枠なので長文は折返しで枠を圧迫する） |
 
+> **出典・根拠は本体 JSON には書かない。** 各社 x/y/size と軸選択の出典・根拠は**別ファイル**
+> `positioning_map_provenance.json`（json_path をキーにしたサイドカー）に持たせる。本体 JSON は値のみ。
+> 詳細は後述の「出典・根拠トレース（provenance サイドカー）」節。
+
+---
+
+## 出典・根拠トレース（provenance サイドカー）
+
+「どの値をどのソースから取ってきたか」を人が細部まで辿れるよう、本体データ（値のみ）とは
+**別ファイル** `positioning_map_provenance.json` に出典・根拠を構造として持たせる。
+
+### 設計思想（3層モデル）
+
+- **① 調査・記録層（あなた＝LLM）**: Web を読み x/y/軸を判断し、**取得・判断したその場で provenance を記録する**。URL は WebFetch/WebSearch で取得した瞬間に得られる最も具体的な出典。**硬い数値（売上・シェア・海外比率 等）は散文の rationale だけでなく `actual_value`/`actual_unit`/`actual_metric` に構造化する**（WEB裏取りの入力になる）。
+- **② レンダリング・検証層（決定論的・Web なし）**: `fill_positioning_map.py`（data→PPTX）と
+  `build_provenance_trace.py`（provenance の検証＋表生成）。①が記録した内容を検証・可視化するだけ。
+- **②.5 WEB 検証層（provenance を入力に裏取り）**: `build_provenance_trace.py --mode verify-prep` が
+  「裏取りすべき硬い事実」の worklist を決定論的に抽出 → **あなた（LLM）が記録 source URL を WebFetch して
+  `actual_value` を照合**（裏付けない/到達不可なら WebSearch にフォールバック）→ `render --verification` が
+  結果をトレース表へ統合し、誤帰属・食い違いがあれば非ゼロ終了する。
+- `fill_positioning_map.py` は provenance を**一切参照しない**（純粋レンダラー）。トレースは必ず別コマンドで実行する。
+
+### サイドカーのスキーマ
+
+`json_path` をキー、値は `{value, actual_value, actual_unit, actual_metric, rationale, source_name, source, confidence}`。
+
+| フィールド | 必須 | 説明 |
+|---|---|---|
+| `rationale` | 必須（空欄NG） | なぜこの値・この軸か |
+| `source_name` | 必須（空欄NG） | 人が読む出典名（例「Tesla IR 2024 決算説明資料」） |
+| `source` | 必須（空欄NG） | 実際に辿れるロケータ＝**Web URL** または**社内資料ファイル名**（例 `競合価格_2024.xlsx`） |
+| `confidence` | 必須（空欄NG） | `実測`（出典の硬い数値）/ `推定`（代理指標から推計）/ `仮置`（定性判断のみ） |
+| `value` | 任意 | 本体値との drift 検知用。**size は正規化相対値（例 100）なので検証には使えない**点に注意 |
+| `actual_value` | 任意（推奨） | **検証対象の生数値**（例 `"3382"`）。これが WEB検証 worklist の採録キー。`confidence=実測` なら必ず埋める |
+| `actual_unit` | 任意 | 生数値の単位（例 `"億円"` / `"%"`） |
+| `actual_metric` | 任意 | 生数値が何の指標か（例 `"連結売上(2024年12月期)"` / `"海外売上比率"`） |
+
+**対象 path（事実・配置系のみ）**: `$.players[i].x` / `.y` / `.size`（本体に size があるとき）＋ `$.x_axis` / `$.y_axis`。
+main_message・示唆（結論文）は対象外。記入例は `references/sample_provenance.json`。
+
+> **actual_\* の使いどころ**: x/y の**配置値そのもの**（x=9 等）は定性的な見立てで検証不能だが、その配置の
+> **根拠としてLLMが引いた硬い事実**（例: パイロット y の「海外比率70%超」、三菱 y の「海外59.7%」）は事実なので、
+> その path の `actual_value`（=`"59.7"`, unit=`"%"`）に構造化すれば size と同じく WEB裏取りの対象になる。
+
+### ワークフロー（記録 → 検証表 → WEB裏取り・いずれも fill とは独立）
+
+```bash
+# ① 雛形生成: 対象 path を列挙した空欄 provenance を自動生成（漏れを構造的に防ぐ）
+python <SKILL_DIR>/scripts/build_provenance_trace.py --mode skeleton \
+  --data {{WORK_DIR}}/positioning_map_data.json \
+  --out  {{WORK_DIR}}/positioning_map_provenance.json
+#   既存ファイルには欠けた path / actual_* だけ追補（手書き分は温存）。--force で全上書き。
+
+# ② あなたが調査の過程で rationale/source_name/source/confidence を逐次埋める（取得時記録）。
+#    硬い数値は actual_value/actual_unit/actual_metric にも構造化する。
+
+# ③ トレース表の生成＋検証（render）
+python <SKILL_DIR>/scripts/build_provenance_trace.py --mode render \
+  --data       {{WORK_DIR}}/positioning_map_data.json \
+  --provenance {{WORK_DIR}}/positioning_map_provenance.json \
+  --out-md     {{OUTPUT_DIR}}/PositioningMap_output_provenance.md
+```
+
+- `render` は `項目(json_path) | 値 | 根拠 | 出典名 | 出典(ロケータ) | 自信度 | 状態` の Markdown 表を出す。
+- **空欄はNG**: 対象 path のエントリ欠落、または `rationale/source_name/source/confidence` のいずれかが空だと
+  `⚠NG` 表示＋NG一覧＋**非ゼロ終了**（表自体は何が NG か見せるため出力する）。空欄を埋めて再実行する。
+- `value` が本体値とズレると `⚠値ズレ`、`confidence` が語彙外だと WARN。
+
+### WEB検証フロー（②.5・任意だが硬い数値があるとき推奨）
+
+provenance に記録した**硬い事実**を、LLM が記録 source URL を fetch して照合する。fact-check-reviewer の
+盲目再検索と違い、**LLMが主張した出典そのものを当たる**ので、出典の誤帰属・捏造（`source_mismatch`）まで検出できる。
+
+```bash
+# ④ verify-prep: 裏取りすべき硬い事実の worklist を抽出（決定論・WEBなし）
+python <SKILL_DIR>/scripts/build_provenance_trace.py --mode verify-prep \
+  --data       {{WORK_DIR}}/positioning_map_data.json \
+  --provenance {{WORK_DIR}}/positioning_map_provenance.json \
+  --out        {{WORK_DIR}}/positioning_map_verification.json
+#   採録条件: confidence ∈ {実測, 推定} かつ actual_value 非空。仮置・純定性配置は対象外。
+#   既存 worklist の記入済み検証欄は温存（追補）。--force で全上書き。
+
+# ⑤ あなた（LLM）が各エントリの source を WebFetch → actual_value を照合 → 検証欄を埋める。
+#    記録URLが裏付けない/到達不可なら WebSearch にフォールバック。
+#    verification_result は次の語彙から1つ:
+#      confirmed / source_mismatch / source_unreachable / discrepancy / not_found / stale
+#    併せて verified_value（ソースが示した値）・method（fetch_source / web_search_fallback）・
+#    verification_note を記入する。
+
+# ⑥ render に --verification を渡して検証結果をトレース表へ統合
+python <SKILL_DIR>/scripts/build_provenance_trace.py --mode render \
+  --data         {{WORK_DIR}}/positioning_map_data.json \
+  --provenance   {{WORK_DIR}}/positioning_map_provenance.json \
+  --verification {{WORK_DIR}}/positioning_map_verification.json \
+  --out-md       {{OUTPUT_DIR}}/PositioningMap_output_provenance.md
+```
+
+- `--verification` 指定時は「## WEB検証結果（記録URL照合）」節が追加される。`--verification` 省略時は従来どおり（後方互換）。
+- **非ゼロ終了**: `verification_result` が空（未検証）、または `source_mismatch`/`discrepancy`/`not_found` のいずれかがあると `1` を返す。
+  `source_unreachable`/`stale` は WARN 止まり、`confidence=実測` なのに `actual_value` 未記入も WARN。
+- **これは出典照合であって万能のファクトチェックではない**。x/y の**定性配置値そのもの**は依然検証対象外。
+  複数の独立ソースでのクロス検証が要る場合のみ `fact-check-reviewer` を併用する。
+
 ---
 
 ## スクリプト実行コマンド
@@ -248,6 +353,10 @@ python <SKILL_DIR>/scripts/fill_positioning_map.py \
 `--brand` を `roleup` に切り替えると Roleup ブランド (A4 横、Yu Gothic UI、褐色アクセント) で生成。
 roleup ではマップが狭くなるため、バブルラベル幅を縮小し、上部 quadrant ラベルを枠外に配置する自動調整が入る。
 `--template` は省略可（brand から `assets/<brand>/positioning-map-template.pptx` を自動解決）。
+
+スライド生成後、上記「出典・根拠トレース」の `build_provenance_trace.py --mode render` を実行して
+`*_provenance.md` を併せて納品する。硬い数値（売上・シェア・海外比率 等）を含む場合は、続けて
+`verify-prep` → 記録URLの WebFetch 照合 → `render --verification` の WEB検証フローまで通す。
 
 ---
 
@@ -319,8 +428,11 @@ roleup ではマップが狭くなるため、バブルラベル幅を縮小し�
 | ファイル | 用途 |
 |---|---|
 | `assets/<brand>/positioning-map-template.pptx` | 名前付きシェイプを焼き込んだ固定枠テンプレート（正本） |
-| `scripts/fill_positioning_map.py` | 生成スクリプト（テキスト流し込み＋バブル描画のみ） |
+| `scripts/fill_positioning_map.py` | 生成スクリプト（テキスト流し込み＋バブル描画のみ。provenance は参照しない） |
+| `scripts/build_provenance_trace.py` | 出典・根拠トレース（skeleton 雛形生成＋verify-prep worklist 抽出＋render 表生成・検証）。Web アクセスなし |
 | `references/sample_data.json` | サンプルデータ（EV市場の架空ポジショニング例） |
+| `references/sample_provenance.json` | provenance サイドカーの記入済みサンプル（actual_* 含む。json_path × 出典・根拠） |
+| `references/sample_verification.json` | WEB検証 worklist の記入済みサンプル（confirmed / source_mismatch / source_unreachable 例） |
 
 **参考/開発用ファイル（スキル外・install 非同梱）:**
 
@@ -333,7 +445,7 @@ roleup ではマップが狭くなるため、バブルラベル幅を縮小し�
 
 ## 注意事項
 
-- **座標の主観性**: x/y値は定性判断で配置することが多い。情報源・根拠を明示し、できるだけ客観指標（価格実績、製品数等）を基準にする
+- **座標の主観性**: x/y値は定性判断で配置することが多い。できるだけ客観指標（価格実績、製品数等）を基準にし、**各社の x/y/size と軸選択の根拠・出典を provenance サイドカー（`positioning_map_provenance.json`）に必ず記録する**（空欄はNG。「出典・根拠トレース」節参照）
 - **バブルサイズ統一**: 同じ指標（売上・従業員数など）で統一することを推奨。異なる指標を混ぜると誤解を招く
 - **象限ラベルの命名**: 中立的な表現を使う。「負け組」「勝ち組」など主観的な表現は避ける
 - **ラベル重なり**: プレイヤーが密集している場合、label_position を明示的に指定して重なりを回避する

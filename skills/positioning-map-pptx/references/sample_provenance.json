@@ -1,0 +1,143 @@
+{
+  "$.players[0].x": {
+    "value": 4.5,
+    "rationale": "汎用モデル中心で専門特化度は中庸。製品ラインの大半が量販グレード",
+    "source_name": "対象会社 製品ラインアップ（社内集計）",
+    "source": "競合製品比較_2024.xlsx",
+    "confidence": "推定"
+  },
+  "$.players[0].y": {
+    "value": 5.0,
+    "rationale": "主力車種の平均提示価格が市場中位帯。高級・低価格いずれにも振れていない",
+    "actual_value": "420",
+    "actual_unit": "万円",
+    "actual_metric": "主力車種の平均提示価格(2024)",
+    "source_name": "対象会社 価格表（社内集計）",
+    "source": "競合価格_2024.xlsx",
+    "confidence": "推定"
+  },
+  "$.players[0].size": {
+    "value": 50,
+    "rationale": "FY24 EV 売上規模（相対指標）。実額は下記 actual_value",
+    "actual_value": "1200",
+    "actual_unit": "億円",
+    "actual_metric": "FY24 EV事業売上高",
+    "source_name": "対象会社 決算説明資料 FY24",
+    "source": "https://target.example.co.jp/ir/fy24.pdf",
+    "confidence": "実測"
+  },
+  "$.players[1].x": {
+    "value": 8.0,
+    "rationale": "自社設計の高機能モデルに特化。OTA・自動運転など専門技術領域が突出",
+    "source_name": "Tesla IR 2024 製品ページ",
+    "source": "https://ir.tesla.com/products",
+    "confidence": "推定"
+  },
+  "$.players[1].y": {
+    "value": 8.0,
+    "rationale": "平均提示価格が市場最高水準帯",
+    "actual_value": "750",
+    "actual_unit": "万円",
+    "actual_metric": "主力モデルの平均提示価格(2024)",
+    "source_name": "Tesla 価格表",
+    "source": "https://www.tesla.com/models",
+    "confidence": "実測"
+  },
+  "$.players[1].size": {
+    "value": 90,
+    "rationale": "FY24 グローバル EV 売上規模（相対指標）。実額は下記 actual_value",
+    "actual_value": "97700",
+    "actual_unit": "百万USD",
+    "actual_metric": "FY2024 自動車部門売上高(10-K)",
+    "source_name": "Tesla 10-K FY2024",
+    "source": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=tsla",
+    "confidence": "実測"
+  },
+  "$.players[2].x": {
+    "value": 5.5,
+    "rationale": "量販〜中専門。バッテリー内製による中位の技術専門性",
+    "source_name": "BYD IR 2024",
+    "source": "https://www.byd.com/ir",
+    "confidence": "推定"
+  },
+  "$.players[2].y": {
+    "value": 3.0,
+    "rationale": "低価格戦略で販売台数を伸長。提示価格は市場下位帯",
+    "actual_value": "230",
+    "actual_unit": "万円",
+    "actual_metric": "主力モデルの平均提示価格(2024)",
+    "source_name": "BYD 価格表",
+    "source": "https://www.byd.com/models",
+    "confidence": "実測"
+  },
+  "$.players[2].size": {
+    "value": 95,
+    "rationale": "FY24 グローバル新エネ車販売台数 No.1 規模（相対指標）。実数は下記 actual_value",
+    "actual_value": "4272145",
+    "actual_unit": "台",
+    "actual_metric": "2024 新エネ車グローバル販売台数",
+    "source_name": "BYD 年次報告書 2024",
+    "source": "https://www.byd.com/ir/annual-2024.pdf",
+    "confidence": "実測"
+  },
+  "$.players[3].x": {
+    "value": 3.5,
+    "rationale": "総合自動車メーカーで EV は汎用量販グレード中心。専門特化度は低め",
+    "source_name": "VW グループ製品概要",
+    "source": "https://www.volkswagen-group.com/products",
+    "confidence": "仮置"
+  },
+  "$.players[3].y": {
+    "value": 5.8,
+    "rationale": "ID シリーズは中〜やや高価格帯",
+    "source_name": "VW 価格表",
+    "source": "https://www.vw.com/models",
+    "confidence": "推定"
+  },
+  "$.players[3].size": {
+    "value": 70,
+    "rationale": "FY24 EV 売上規模（相対指標）。代理指標からの推計値",
+    "actual_value": "180",
+    "actual_unit": "万台",
+    "actual_metric": "2024 BEV グローバル納車台数(推計)",
+    "source_name": "VW グループ アニュアルレポート 2024",
+    "source": "https://annualreport2024.volkswagen-group.com",
+    "confidence": "推定"
+  },
+  "$.players[4].x": {
+    "value": 5.5,
+    "rationale": "E-GMP 専用プラットフォームで中位の技術専門性",
+    "source_name": "現代自動車 IR 2024",
+    "source": "https://www.hyundai.com/worldwide/ir",
+    "confidence": "推定"
+  },
+  "$.players[4].y": {
+    "value": 4.2,
+    "rationale": "中価格帯。VW より下、BYD より上",
+    "source_name": "現代自動車 価格表",
+    "source": "competitor_price_survey_2024.xlsx",
+    "confidence": "仮置"
+  },
+  "$.players[4].size": {
+    "value": 60,
+    "rationale": "FY24 EV 売上規模（相対指標）。代理指標からの推計値",
+    "actual_value": "62",
+    "actual_unit": "万台",
+    "actual_metric": "2024 BEV グローバル販売台数(推計)",
+    "source_name": "現代自動車 事業報告書 2024",
+    "source": "https://www.hyundai.com/worldwide/ir/financial",
+    "confidence": "推定"
+  },
+  "$.x_axis": {
+    "rationale": "EV 市場は汎用量販〜専門高機能でプレイヤーが明確に分散するため、製品専門性を X 軸に採用",
+    "source_name": "EV 市場ポジショニング分析（業界レポート）",
+    "source": "https://example.com/ev-market-positioning-2024",
+    "confidence": "推定"
+  },
+  "$.y_axis": {
+    "rationale": "価格帯で戦略グループ（プレミアム vs マス）が割れるため Y 軸に採用。軸選択自体は判断（単一数値の裏取り対象ではない）",
+    "source_name": "各社価格表からの横断比較（社内集計）",
+    "source": "競合価格_2024.xlsx",
+    "confidence": "推定"
+  }
+}
